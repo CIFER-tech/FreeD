@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- netstandard2.1: .NET 8 のアプリからも、Unity (2021.2+) の Plugins/ に置いた DLL からも使える -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RootNamespace>FreeD</RootNamespace>
+    <AssemblyName>FreeD</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+</Project>
