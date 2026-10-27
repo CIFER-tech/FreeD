@@ -33,6 +33,8 @@ public class FreeDReceiver : MonoBehaviour
     [Header("状態 (読み取り専用)")]
     public bool receiving;
     public int packetsPerSecond;
+    [Tooltip("直近1秒の受信間隔 (ms)")]
+    public float meanIntervalMs, maxIntervalMs;
     public double pan, tilt, roll;
     public double xMm, yMm, zMm;
 
@@ -43,6 +45,8 @@ public class FreeDReceiver : MonoBehaviour
     private FreeDPacket _latest;
     private bool _has;
     private int _count;
+    private double _sumInterval, _maxInterval, _lastRx = -1;
+    private readonly System.Diagnostics.Stopwatch _sw = System.Diagnostics.Stopwatch.StartNew();
     private float _rateTimer, _lastPacketTime;
 
     void OnEnable()
@@ -76,7 +80,13 @@ public class FreeDReceiver : MonoBehaviour
                 byte[] data = _udp.Receive(ref any);
                 if (!FreeDCodec.TryDecode(data, out FreeDPacket p)) continue;
                 if (cameraId != 0 && p.CameraId != cameraId) continue;
-                lock (_lock) { _latest = p; _has = true; _count++; }
+                double now = _sw.Elapsed.TotalMilliseconds;
+                lock (_lock)
+                {
+                    _latest = p; _has = true; _count++;
+                    if (_lastRx >= 0) { double d = now - _lastRx; _sumInterval += d; if (d > _maxInterval) _maxInterval = d; }
+                    _lastRx = now;
+                }
             }
             catch (SocketException) { }
             catch (ObjectDisposedException) { return; }
@@ -91,7 +101,13 @@ public class FreeDReceiver : MonoBehaviour
         _rateTimer += Time.unscaledDeltaTime;
         if (_rateTimer >= 1f)
         {
-            lock (_lock) { packetsPerSecond = Mathf.RoundToInt(_count / _rateTimer); _count = 0; }
+            lock (_lock)
+            {
+                packetsPerSecond = Mathf.RoundToInt(_count / _rateTimer);
+                meanIntervalMs = _count > 1 ? (float)(_sumInterval / (_count - 1)) : 0f;
+                maxIntervalMs = (float)_maxInterval;
+                _count = 0; _sumInterval = 0; _maxInterval = 0;
+            }
             _rateTimer = 0f;
         }
         if (!has) { receiving = Time.unscaledTime - _lastPacketTime < 0.5f; return; }
@@ -124,7 +140,7 @@ public class FreeDReceiver : MonoBehaviour
     void OnGUI()
     {
         GUI.Label(new Rect(10, 10, 420, 60),
-            (receiving ? "FreeD 受信中 " : "FreeD 待機 ") + packetsPerSecond + " pkt/s\n" +
+            (receiving ? "FreeD 受信中 " : "FreeD 待機 ") + packetsPerSecond + " pkt/s  間隔 平均" + meanIntervalMs.ToString("F1") + " 最大" + maxIntervalMs.ToString("F1") + " ms\n" +
             string.Format("位置 mm {0:F1} {1:F1} {2:F1}\n角度 ° {3:F2} {4:F2} {5:F2}", xMm, yMm, zMm, pan, tilt, roll));
     }
 }
