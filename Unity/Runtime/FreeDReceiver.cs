@@ -102,7 +102,7 @@ public class FreeDReceiver : MonoBehaviour
         xMm = p.XMeters * 1000; yMm = p.YMeters * 1000; zMm = p.ZMeters * 1000;
 
         // retroloc 座標 (X右 Y前 Z上) の姿勢。AngleAxis は数値的に標準の回転なので、そのまま合成できる。
-        Quaternion q = Rot(p.PanDegrees * panSign, p.TiltDegrees * tiltSign, p.RollDegrees * rollSign);
+        Quaternion q = Rot((float)p.PanDegrees * panSign, (float)p.TiltDegrees * tiltSign, (float)p.RollDegrees * rollSign);
         Vector3 pos = new Vector3((float)p.XMeters, (float)p.YMeters, (float)p.ZMeters);
 
         // トラッカー座標でのオフセットを適用してからUnityへ変換
