@@ -33,6 +33,17 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 
 詳しいメッセージ配置・仕様の注意点はリポジトリ直下の [README](../README.md) を参照。
 
+## 受信コンポーネント (FreeDReceiver)
+
+Unity のカメラ (または任意のオブジェクト) に `FreeDReceiver` を付けるだけで、UDP で受信したFreeDが位置・向きに反映される。
+
+1. パッケージを入れ、カメラに `FreeDReceiver` を追加する。
+2. `port` を retroloc の「FreeD送信」のポート (既定 40000) に合わせる。
+3. 再生すると、左上に受信状態・位置 (mm)・角度 (°) が出る。
+4. 向きが逆なら `panSign` / `tiltSign` / `rollSign` を -1 にする。カメラ取り付けのずれは `positionOffset` / `rotationOffset` で合わせる。
+
+座標は retroloc のワールド (X=右, Y=前, Z=上, m) から Unity へ `(x, y, z) → (x, z, y)` で変換する。
+
 ## DLL の更新について
 
 このフォルダの `Runtime/FreeD.dll` は `src/FreeD` のビルド出力をそのまま同梱したもの。
