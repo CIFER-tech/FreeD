@@ -51,7 +51,7 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* 長さ・種別・�
 `FreeDReceiver` を付けたカメラを、`FreeDOrigin` を付けた空のオブジェクトの子にする。`FreeDOrigin` の位置と水平の向きが「retroloc の原点が Unity のどこにあるか」になる (青い矢印 = retroloc の Y、赤い矢印 = X)。
 
 - 数値で決める: `FreeDOrigin` のオブジェクトの Position と Rotation の Y に入れる。
-- Unity のオブジェクトで決める: ステージの隅など、retroloc の原点にあたる場所に空のオブジェクトを置き、`FreeDOrigin` の `Place` に入れる。そのオブジェクトを動かすと原点も付いてくる。
+- Unity のオブジェクトで決める: ステージの隅など、retroloc の原点にあたる場所に空のオブジェクトを置き、`FreeDOrigin` の `Origin Marker` に入れる。そのオブジェクトを動かすと原点も付いてくる。
 - 吸収するのは位置 3 軸と水平の向きだけ。床は水平とみなすので、傾き (X・Z の回転) は 0 に保つ。
 
 ## ビルドとテスト
