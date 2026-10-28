@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.2.0] - 2026-10-29
+
+- `FreeDReceiver` の `positionOffset` / `rotationOffset` を Unity 座標 (カメラのローカル軸: X=右, Y=上, Z=前。回転は Transform の Rotation と同じ向き) で指定するように変更。以前は FreeD 座標 (X右 Y前 Z上) だったので、使っていた値は入れ直しが必要。
+
 ## [1.1.2] - 2026-10-28
 
 - `FreeDReceiver` に受信間隔(平均・最大)の表示を追加。

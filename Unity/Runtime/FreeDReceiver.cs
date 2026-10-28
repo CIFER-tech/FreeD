@@ -24,10 +24,10 @@ public class FreeDReceiver : MonoBehaviour
     public float tiltSign = 1f;
     public float rollSign = 1f;
 
-    [Header("手動オフセット (カメラ取り付けのずれ)")]
-    [Tooltip("トラッカーからカメラまで (トラッカー座標, m)")]
+    [Header("手動オフセット (カメラ取り付けのずれ。Unity 座標)")]
+    [Tooltip("トラッカーからカメラまで (Unity のカメラの軸: X=右, Y=上, Z=前, m)")]
     public Vector3 positionOffset = Vector3.zero;
-    [Tooltip("度。パン/チルト/ロール")]
+    [Tooltip("度。Unity のカメラの軸まわり (X=チルト, Y=パン, Z=ロール)。Transform の Rotation と同じ向き")]
     public Vector3 rotationOffset = Vector3.zero;
 
     [Header("状態 (読み取り専用)")]
@@ -121,13 +121,11 @@ public class FreeDReceiver : MonoBehaviour
         Quaternion q = Rot((float)p.PanDegrees * panSign, (float)p.TiltDegrees * tiltSign, (float)p.RollDegrees * rollSign);
         Vector3 pos = new Vector3((float)p.XMeters, (float)p.YMeters, (float)p.ZMeters);
 
-        // トラッカー座標でのオフセットを適用してからUnityへ変換
-        Quaternion qo = Rot(rotationOffset.x, rotationOffset.y, rotationOffset.z);
-        pos += q * positionOffset;
-        q = q * qo;
-
-        transform.localPosition = new Vector3(pos.x, pos.z, pos.y);
-        transform.localRotation = new Quaternion(-q.x, -q.z, -q.y, q.w);
+        // Unity 座標へ変換してから、Unity のカメラのローカル軸でオフセットを適用する
+        Vector3 uPos = new Vector3(pos.x, pos.z, pos.y);
+        Quaternion uRot = new Quaternion(-q.x, -q.z, -q.y, q.w);
+        transform.localPosition = uPos + uRot * positionOffset;
+        transform.localRotation = uRot * Quaternion.Euler(rotationOffset);
     }
 
     static Quaternion Rot(float pan, float tilt, float roll)
