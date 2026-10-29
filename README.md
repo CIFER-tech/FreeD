@@ -46,6 +46,27 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* 長さ・種別・�
 **公式の仕様書原本は未確認。** 受信機ごとの軸の向き・角度の符号・ズーム/フォーカスの扱いは実機で確認すること
 (このライブラリは値をそのまま載せるだけで、符号の反転や座標系の変換は呼び出し側の仕事)。
 
+## 複数のストリームを合成する
+
+姿勢 (retroloc) とレンズ (ズーム・フォーカス) のように、別々に届く FreeD を `FreeDMerger` で 1 つの `FreeDPacket` にまとめる。
+
+```csharp
+var merger = new FreeDMerger(new[]
+{
+    FreeDFields.Rotation | FreeDFields.Position,   // ストリーム 0: 姿勢
+    FreeDFields.Zoom | FreeDFields.Focus,          // ストリーム 1: レンズ
+});
+merger.SetDelay(1, 30);                            // ストリーム 1 の反映を 30 ms 遅らせる (省略可)
+
+merger.Put(0, poseOrLensPacket, receivedMs);       // 受信のたびに、ストリームの番号と受信時刻 (ms) を付けて渡す
+FreeDFields filled = merger.Update(nowMs, out FreeDPacket merged);  // filled に含まれる項目だけ merged を使える
+```
+
+- 同じ項目を 2 つのストリームが担当すると、コンストラクタが `ArgumentException` を投げる。
+- 項目ごとに、担当するストリームで最後に届いた値を保つ。途切れたかどうかは `IsReceiving(streamIndex, nowMs)`。
+- スレッドに対して安全ではない。受信スレッドと更新スレッドが別なら、呼び出し側でロックする。
+- Unity では `FreeDReceiver` が使っている ([`Unity/`](Unity) 参照)。
+
 ## Unity で原点を合わせる
 
 `FreeDReceiver` を付けたカメラを、`FreeDOrigin` を付けた空のオブジェクトの子にする。`FreeDOrigin` の位置と水平の向きが「retroloc の原点が Unity のどこにあるか」になる (青い矢印 = retroloc の Y、赤い矢印 = X)。
