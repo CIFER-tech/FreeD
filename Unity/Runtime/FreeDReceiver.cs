@@ -1,23 +1,69 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using FreeD;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// FreeD (UDP) を受信して、このオブジェクト (カメラ) の位置と向きに反映する。
+/// ストリーム (ポート) を複数並べて、回転・位置・ズーム・フォーカスのどれをどのストリームから使うかを選べる
+/// (例: 姿勢は retroloc のポート 40000、ズームとフォーカスはレンズエンコーダのポート 40001)。
 /// retroloc のワールド (X=右, Y=前, Z=上, m) を Unity に変換する。
 /// 回転は R = Rz(パン) · Rx(チルト) · Ry(ロール)。パンは反時計回りが正、チルトは上向きが正。
+/// ズームとフォーカスの生の値は zoomRaw / focusRaw に出る。カメラに反映するには FreeDLens を付ける。
 /// </summary>
 [DisallowMultipleComponent]
-public class FreeDReceiver : MonoBehaviour
+public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
 {
+    [Serializable]
+    public class Stream
+    {
+        [Tooltip("送信側の FreeD送信 のポートと同じにする")]
+        public int port = 40000;
+        [Tooltip("0 = 全カメラ")]
+        public int cameraId = 0;
+
+        [Header("このストリームから使う項目 (同じ項目は 1 つのストリームだけ)")]
+        public bool rotation = true;
+        public bool position = true;
+        public bool zoom = true;
+        public bool focus = true;
+
+        [Tooltip("ms。他のストリームより早く届くときに、この分だけ反映を遅らせてそろえる")]
+        public float delayMs = 0f;
+
+        [Header("状態 (読み取り専用)")]
+        public bool receiving;
+        public int packetsPerSecond;
+        [Tooltip("直近1秒の受信間隔 (ms)")]
+        public float meanIntervalMs, maxIntervalMs;
+
+        // 受信スレッドが書き、Update が読む。FreeDReceiver の _lock で守る。
+        [NonSerialized] internal int count;
+        [NonSerialized] internal double sumIntervalMs, maxIntervalMsSoFar, lastReceivedMs = -1;
+
+        public FreeDFields Fields
+        {
+            get
+            {
+                return (rotation ? FreeDFields.Rotation : 0) | (position ? FreeDFields.Position : 0)
+                     | (zoom ? FreeDFields.Zoom : 0) | (focus ? FreeDFields.Focus : 0);
+            }
+            set
+            {
+                rotation = (value & FreeDFields.Rotation) != 0;
+                position = (value & FreeDFields.Position) != 0;
+                zoom = (value & FreeDFields.Zoom) != 0;
+                focus = (value & FreeDFields.Focus) != 0;
+            }
+        }
+    }
+
     [Header("受信")]
-    [Tooltip("retroloc の FreeD送信 のポートと同じにする")]
-    public int port = 40000;
-    [Tooltip("0 = 全カメラ")]
-    public int cameraId = 0;
+    public List<Stream> streams = new List<Stream> { new Stream() };
 
     [Header("符号 (向きが逆なら -1)")]
     public float panSign = 1f;
@@ -32,60 +78,139 @@ public class FreeDReceiver : MonoBehaviour
 
     [Header("状態 (読み取り専用)")]
     public bool receiving;
-    public int packetsPerSecond;
-    [Tooltip("直近1秒の受信間隔 (ms)")]
-    public float meanIntervalMs, maxIntervalMs;
     public double pan, tilt, roll;
     public double xMm, yMm, zMm;
+    [Tooltip("ズーム・フォーカスのエンコーダの生の値 (24bit)。FreeDLens が焦点距離とピント距離に直す")]
+    public uint zoomRaw, focusRaw;
+    public bool hasZoom, hasFocus;
 
-    private UdpClient _udp;
-    private Thread _thread;
+    // 1.2 までの設定 (ストリームが 1 本だけだった)。読み込んだときに streams の 1 本目へ移す。
+    [SerializeField, HideInInspector, FormerlySerializedAs("port")] private int _legacyPort = -1;
+    [SerializeField, HideInInspector, FormerlySerializedAs("cameraId")] private int _legacyCameraId;
+
+    private readonly List<UdpClient> _udps = new List<UdpClient>();
+    private readonly List<Thread> _threads = new List<Thread>();
     private volatile bool _run;
     private readonly object _lock = new object();
-    private FreeDPacket _latest;
-    private bool _has;
-    private int _count;
-    private double _sumInterval, _maxInterval, _lastRx = -1;
+    private FreeDMerger _merger;
+    private int _startedSignature;
     private readonly System.Diagnostics.Stopwatch _sw = System.Diagnostics.Stopwatch.StartNew();
-    private float _rateTimer, _lastPacketTime;
+    private float _rateTimer;
+    // OnValidate で「今回新しくチェックされた項目」を見つけるための、前回のチェックの状態
+    [NonSerialized] private List<FreeDFields> _lastFields;
 
-    void OnEnable()
+    public void OnBeforeSerialize() { }
+
+    public void OnAfterDeserialize()
     {
-        _run = true;
-        try
-        {
-            _udp = new UdpClient(new IPEndPoint(IPAddress.Any, port));
-            _udp.Client.ReceiveTimeout = 200;
-        }
-        catch (Exception e) { Debug.LogError("FreeD: ポート " + port + " を開けない: " + e.Message); return; }
-        _thread = new Thread(Loop) { IsBackground = true, Name = "FreeDReceiver" };
-        _thread.Start();
+        if (_legacyPort < 0) return;
+        streams = new List<Stream> { new Stream { port = _legacyPort, cameraId = _legacyCameraId } };
+        _legacyPort = -1;
     }
 
-    void OnDisable()
+    void OnValidate() { ResolveOverlaps(); }
+
+    /// <summary>
+    /// 同じ項目を 2 つのストリームが使わないようにする。
+    /// 今回チェックされた項目は、他のストリームのチェックを外して譲らせる。追加されたばかりのストリームは、他が使っている項目を譲る側にする。
+    /// </summary>
+    void ResolveOverlaps()
+    {
+        for (int i = 0; i < streams.Count; i++)
+        {
+            bool isExisting = _lastFields != null && i < _lastFields.Count;
+            if (!isExisting) continue;
+            FreeDFields added = streams[i].Fields & ~_lastFields[i];
+            for (int j = 0; j < streams.Count; j++)
+                if (j != i) streams[j].Fields &= ~added;
+        }
+        for (int i = 0; i < streams.Count; i++)
+        {
+            bool isNew = _lastFields == null || i >= _lastFields.Count;
+            if (!isNew) continue;
+            FreeDFields claimedByOthers = FreeDFields.None;
+            for (int j = 0; j < streams.Count; j++)
+                if (j != i) claimedByOthers |= streams[j].Fields;
+            streams[i].Fields &= ~claimedByOthers;
+        }
+
+        _lastFields = new List<FreeDFields>();
+        foreach (Stream s in streams) _lastFields.Add(s.Fields);
+    }
+
+    void OnEnable() { StartReceiving(); }
+    void OnDisable() { StopReceiving(); }
+
+    void StartReceiving()
+    {
+        _startedSignature = Signature();
+        var fields = new List<FreeDFields>();
+        foreach (Stream s in streams) fields.Add(s.Fields);
+        try { _merger = new FreeDMerger(fields); }
+        catch (ArgumentException e) { Debug.LogError("FreeD: " + e.Message); return; }
+
+        _run = true;
+        for (int i = 0; i < streams.Count; i++)
+        {
+            Stream stream = streams[i];
+            int streamIndex = i;
+            UdpClient udp;
+            try
+            {
+                udp = new UdpClient(new IPEndPoint(IPAddress.Any, stream.port));
+                udp.Client.ReceiveTimeout = 200;
+            }
+            catch (Exception e) { Debug.LogError("FreeD: ポート " + stream.port + " を開けない: " + e.Message); continue; }
+            var thread = new Thread(() => Loop(streamIndex, stream, udp)) { IsBackground = true, Name = "FreeDReceiver " + stream.port };
+            _udps.Add(udp);
+            _threads.Add(thread);
+            thread.Start();
+        }
+    }
+
+    void StopReceiving()
     {
         _run = false;
-        try { _udp?.Close(); } catch { }
-        _thread?.Join(500);
-        _thread = null; _udp = null;
+        foreach (UdpClient udp in _udps) { try { udp.Close(); } catch { } }
+        foreach (Thread thread in _threads) thread.Join(500);
+        _udps.Clear(); _threads.Clear();
+        _merger = null;
     }
 
-    void Loop()
+    /// <summary>ポート・カメラ ID・項目・本数のどれかが変わると値が変わる。再生中の設定変更で受信をやり直す目印。</summary>
+    int Signature()
+    {
+        unchecked
+        {
+            int hash = streams.Count;
+            foreach (Stream s in streams)
+                hash = hash * 31 + (s.port * 31 + s.cameraId) * 31 + (int)s.Fields;
+            return hash;
+        }
+    }
+
+    void Loop(int streamIndex, Stream stream, UdpClient udp)
     {
         var any = new IPEndPoint(IPAddress.Any, 0);
         while (_run)
         {
             try
             {
-                byte[] data = _udp.Receive(ref any);
+                byte[] data = udp.Receive(ref any);
                 if (!FreeDCodec.TryDecode(data, out FreeDPacket p)) continue;
-                if (cameraId != 0 && p.CameraId != cameraId) continue;
+                if (stream.cameraId != 0 && p.CameraId != stream.cameraId) continue;
                 double now = _sw.Elapsed.TotalMilliseconds;
                 lock (_lock)
                 {
-                    _latest = p; _has = true; _count++;
-                    if (_lastRx >= 0) { double d = now - _lastRx; _sumInterval += d; if (d > _maxInterval) _maxInterval = d; }
-                    _lastRx = now;
+                    _merger.Put(streamIndex, p, now);
+                    stream.count++;
+                    if (stream.lastReceivedMs >= 0)
+                    {
+                        double d = now - stream.lastReceivedMs;
+                        stream.sumIntervalMs += d;
+                        if (d > stream.maxIntervalMsSoFar) stream.maxIntervalMsSoFar = d;
+                    }
+                    stream.lastReceivedMs = now;
                 }
             }
             catch (SocketException) { }
@@ -95,37 +220,64 @@ public class FreeDReceiver : MonoBehaviour
 
     void Update()
     {
-        FreeDPacket p; bool has;
-        lock (_lock) { p = _latest; has = _has; _has = false; }
+        if (Signature() != _startedSignature) { StopReceiving(); StartReceiving(); }
+        if (_merger == null) return;
 
-        _rateTimer += Time.unscaledDeltaTime;
-        if (_rateTimer >= 1f)
+        double nowMs = _sw.Elapsed.TotalMilliseconds;
+        FreeDFields filled;
+        FreeDPacket p;
+        lock (_lock)
         {
-            lock (_lock)
+            for (int i = 0; i < streams.Count; i++) _merger.SetDelay(i, streams[i].delayMs);
+            filled = _merger.Update(nowMs, out p);
+            receiving = false;
+            for (int i = 0; i < streams.Count; i++)
             {
-                packetsPerSecond = Mathf.RoundToInt(_count / _rateTimer);
-                meanIntervalMs = _count > 1 ? (float)(_sumInterval / (_count - 1)) : 0f;
-                maxIntervalMs = (float)_maxInterval;
-                _count = 0; _sumInterval = 0; _maxInterval = 0;
+                streams[i].receiving = _merger.IsReceiving(i, nowMs);
+                receiving |= streams[i].receiving;
             }
-            _rateTimer = 0f;
         }
-        if (!has) { receiving = Time.unscaledTime - _lastPacketTime < 0.5f; return; }
-        _lastPacketTime = Time.unscaledTime;
-        receiving = true;
+        UpdateRates();
 
-        pan = p.PanDegrees; tilt = p.TiltDegrees; roll = p.RollDegrees;
-        xMm = p.XMeters * 1000; yMm = p.YMeters * 1000; zMm = p.ZMeters * 1000;
+        if ((filled & FreeDFields.Zoom) != 0) { zoomRaw = p.ZoomRaw; hasZoom = true; }
+        if ((filled & FreeDFields.Focus) != 0) { focusRaw = p.FocusRaw; hasFocus = true; }
+        ApplyPose(filled, p);
+    }
+
+    void UpdateRates()
+    {
+        _rateTimer += Time.unscaledDeltaTime;
+        if (_rateTimer < 1f) return;
+        lock (_lock)
+        {
+            foreach (Stream s in streams)
+            {
+                s.packetsPerSecond = Mathf.RoundToInt(s.count / _rateTimer);
+                s.meanIntervalMs = s.count > 1 ? (float)(s.sumIntervalMs / (s.count - 1)) : 0f;
+                s.maxIntervalMs = (float)s.maxIntervalMsSoFar;
+                s.count = 0; s.sumIntervalMs = 0; s.maxIntervalMsSoFar = 0;
+            }
+        }
+        _rateTimer = 0f;
+    }
+
+    void ApplyPose(FreeDFields filled, FreeDPacket p)
+    {
+        bool hasRotation = (filled & FreeDFields.Rotation) != 0;
+        bool hasPosition = (filled & FreeDFields.Position) != 0;
+        if (hasRotation) { pan = p.PanDegrees; tilt = p.TiltDegrees; roll = p.RollDegrees; }
+        if (hasPosition) { xMm = p.XMeters * 1000; yMm = p.YMeters * 1000; zMm = p.ZMeters * 1000; }
 
         // retroloc 座標 (X右 Y前 Z上) の姿勢。AngleAxis は数値的に標準の回転なので、そのまま合成できる。
+        // 回転のストリームがないときは p の角度が 0 なので、単位回転になる。
         Quaternion q = Rot((float)p.PanDegrees * panSign, (float)p.TiltDegrees * tiltSign, (float)p.RollDegrees * rollSign);
         Vector3 pos = new Vector3((float)p.XMeters, (float)p.YMeters, (float)p.ZMeters);
 
         // Unity 座標へ変換してから、Unity のカメラのローカル軸でオフセットを適用する
         Vector3 uPos = new Vector3(pos.x, pos.z, pos.y);
         Quaternion uRot = new Quaternion(-q.x, -q.z, -q.y, q.w);
-        transform.localPosition = uPos + uRot * positionOffset;
-        transform.localRotation = uRot * Quaternion.Euler(rotationOffset);
+        if (hasPosition) transform.localPosition = uPos + uRot * positionOffset;
+        if (hasRotation) transform.localRotation = uRot * Quaternion.Euler(rotationOffset);
     }
 
     static Quaternion Rot(float pan, float tilt, float roll)
@@ -137,8 +289,15 @@ public class FreeDReceiver : MonoBehaviour
 
     void OnGUI()
     {
-        GUI.Label(new Rect(10, 10, 420, 60),
-            (receiving ? "FreeD 受信中 " : "FreeD 待機 ") + packetsPerSecond + " pkt/s  間隔 平均" + meanIntervalMs.ToString("F1") + " 最大" + maxIntervalMs.ToString("F1") + " ms\n" +
-            string.Format("位置 mm {0:F1} {1:F1} {2:F1}\n角度 ° {3:F2} {4:F2} {5:F2}", xMm, yMm, zMm, pan, tilt, roll));
+        var text = new System.Text.StringBuilder();
+        text.Append(receiving ? "FreeD 受信中\n" : "FreeD 待機\n");
+        foreach (Stream s in streams)
+        {
+            text.AppendFormat("  :{0} {1} {2} pkt/s  間隔 平均{3:F1} 最大{4:F1} ms\n",
+                s.port, s.receiving ? "受信中" : "途切れ", s.packetsPerSecond, s.meanIntervalMs, s.maxIntervalMs);
+        }
+        text.AppendFormat("位置 mm {0:F1} {1:F1} {2:F1}\n角度 ° {3:F2} {4:F2} {5:F2}\n", xMm, yMm, zMm, pan, tilt, roll);
+        text.AppendFormat("ズーム {0}  フォーカス {1}", hasZoom ? zoomRaw.ToString() : "-", hasFocus ? focusRaw.ToString() : "-");
+        GUI.Label(new Rect(10, 10, 460, 40 + 18 * streams.Count), text.ToString());
     }
 }
