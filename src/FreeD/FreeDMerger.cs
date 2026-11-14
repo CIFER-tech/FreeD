@@ -3,17 +3,6 @@ using System.Collections.Generic;
 
 namespace FreeD
 {
-    /// <summary>合成の対象になる項目。ストリームごとに、どの項目を使うかを選ぶ。</summary>
-    [Flags]
-    public enum FreeDFields
-    {
-        None = 0,
-        Position = 1 << 0, // X・Y・Z
-        Rotation = 1 << 1, // パン・チルト・ロール
-        Zoom = 1 << 2,
-        Focus = 1 << 3,
-    }
-
     /// <summary>
     /// 複数の FreeD ストリーム (例: retroloc の姿勢と、レンズエンコーダのズーム・フォーカス) を 1 つの <see cref="FreeDPacket"/> にまとめる。
     /// 項目ごとに、担当するストリームで最後に届いた値を使う。途切れても値は保つ。
