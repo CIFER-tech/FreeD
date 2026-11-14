@@ -14,7 +14,7 @@ namespace CIFER.tech.FreeD.Unity
 
         private void OnEnable()
         {
-#if UNITY_6000_0_OR_NEWER
+#if UNITY_6000_5_OR_NEWER
             receivers.AddRange(FindObjectsByType<FreeDReceiverForUnity>(FindObjectsInactive.Include));
             trackers.AddRange(FindObjectsByType<FreeDTracker>(FindObjectsInactive.Include));
 #elif UNITY_2022_2_OR_NEWER
