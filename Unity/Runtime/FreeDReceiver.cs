@@ -32,7 +32,7 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
         [Tooltip("ms。他のストリームより早く届くときに、この分だけ反映を遅らせてそろえる")]
         public float delayMs = 0f;
 
-        [Header("状態 (読み取り専用)")]
+        [Header("状態")]
         [FreeDReadOnly] public bool receiving;
         [FreeDReadOnly] public int packetsPerSecond;
         [Tooltip("直近1秒の受信間隔 (ms)"), FreeDReadOnly]
@@ -84,7 +84,7 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
     [Tooltip("度。Unity のカメラの軸まわり (X=チルト, Y=パン, Z=ロール)。Transform の Rotation と同じ向き")]
     public Vector3 rotationOffset = Vector3.zero;
 
-    [Header("状態 (読み取り専用)")]
+    // 状態の欄は FreeDReceiverEditor が枠で囲んで描く (Header は付けない)
     [FreeDReadOnly] public bool receiving;
     [Tooltip("度。X=パン, Y=チルト, Z=ロール"), FreeDReadOnly] public Vector3 panTiltRollDeg;
     [Tooltip("mm。FreeD 座標 (X=右, Y=前, Z=上)"), FreeDReadOnly] public Vector3 positionMm;
