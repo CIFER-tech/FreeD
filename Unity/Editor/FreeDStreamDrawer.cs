@@ -8,7 +8,8 @@ public class FreeDStreamDrawer : PropertyDrawer
     static readonly string[] SettingNames = { "port", "cameraId", "fields", "delayMs" };
     static readonly string[] StatusNames = { "receiving", "packetsPerSecond", "meanIntervalMs", "maxIntervalMs" };
 
-    const float BoxPadding = 0f;
+    // 枠の余白は、FreeDReceiver 本体の状態の枠 (EditorStyles.helpBox) と同じ既定値を使う。
+    static RectOffset BoxPadding { get { return EditorStyles.helpBox.padding; } }
 
     static float LineHeight { get { return EditorGUIUtility.singleLineHeight; } }
     static float Spacing { get { return EditorGUIUtility.standardVerticalSpacing; } }
@@ -23,7 +24,7 @@ public class FreeDStreamDrawer : PropertyDrawer
 
     static float StatusBoxHeight(SerializedProperty stream)
     {
-        return BoxPadding * 2 + FieldsHeight(stream, StatusNames);
+        return BoxPadding.vertical + FieldsHeight(stream, StatusNames);
     }
 
     public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
@@ -48,7 +49,7 @@ public class FreeDStreamDrawer : PropertyDrawer
         GUI.Box(box, GUIContent.none, EditorStyles.helpBox);
 
         // 枠の内側に余白をとって描く。位置は枠に合わせて計算済みなので、字下げは 0 に戻す。
-        Rect inner = new Rect(box.x + BoxPadding, box.y + BoxPadding, box.width - BoxPadding * 2, box.height - BoxPadding * 2);
+        Rect inner = BoxPadding.Remove(box);
         int savedIndentLevel = EditorGUI.indentLevel;
         EditorGUI.indentLevel = 0;
         float innerY = inner.y;
