@@ -35,6 +35,10 @@ public class FreeDReceiver : MonoBehaviour
     private SocketAsyncEventArgs _receiveArgs;
     private CancellationTokenSource _cancellation;
 
+    // 開こうとしたか (失敗したときも true)。開こうとしたときのポート。
+    private bool _isOpenRequested;
+    private int _requestedPort;
+
     internal FreeDFields UsedFields
     {
         get
@@ -43,7 +47,27 @@ public class FreeDReceiver : MonoBehaviour
         }
     }
 
-    internal void Open()
+    /// <summary>
+    /// 有効か無効か、ポートが変わったかに合わせて、受信を開く・閉じる。FreeDManager が毎フレーム呼ぶ。
+    /// 開くのに失敗したときは、無効にするかポートを変えるまで、開き直さない (毎フレーム、エラーを出さないため)。
+    /// </summary>
+    internal void SyncSocket()
+    {
+        bool shouldOpen = isActiveAndEnabled;
+        if (_isOpenRequested && (!shouldOpen || _requestedPort != port))
+        {
+            Close();
+        }
+
+        if (!_isOpenRequested && shouldOpen)
+        {
+            _isOpenRequested = true;
+            _requestedPort = port;
+            Open();
+        }
+    }
+
+    private void Open()
     {
         try
         {
@@ -66,6 +90,7 @@ public class FreeDReceiver : MonoBehaviour
 
     internal void Close()
     {
+        _isOpenRequested = false;
         if (_cancellation != null)
         {
             _cancellation.Cancel();
