@@ -25,13 +25,13 @@ public class FreeDLens : MonoBehaviour
     private Camera _camera;
     private FreeDTracker _tracker;
 
-    void Awake()
+    private void Awake()
     {
         _camera = GetComponent<Camera>();
         _tracker = GetComponent<FreeDTracker>();
     }
 
-    void LateUpdate()
+    private void LateUpdate()
     {
         if (_tracker.hasZoom && zoomToFocalLengthMm.length > 0)
         {

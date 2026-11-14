@@ -10,7 +10,7 @@ public class FreeDReadOnlyDrawer : PropertyDrawer
         EditorGUI.LabelField(position, label, new GUIContent(ValueText(property)));
     }
 
-    static string ValueText(SerializedProperty property)
+    private static string ValueText(SerializedProperty property)
     {
         switch (property.propertyType)
         {

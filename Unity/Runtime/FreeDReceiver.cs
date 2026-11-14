@@ -38,10 +38,10 @@ public class FreeDReceiver : MonoBehaviour
     }
 
     // 有効・無効が変わったことを Manager に知らせる。受信を開き直すのは Manager。
-    void OnEnable() { NotifyManager(); }
-    void OnDisable() { NotifyManager(); }
+    private void OnEnable() { NotifyManager(); }
+    private void OnDisable() { NotifyManager(); }
 
-    static void NotifyManager()
+    private static void NotifyManager()
     {
         if (FreeDManager.Instance != null) FreeDManager.Instance.MarkReceiversChanged();
     }
@@ -78,7 +78,7 @@ public class FreeDReceiver : MonoBehaviour
         _cancellation = null;
     }
 
-    async Task ReceiveLoopAsync(UdpClient udp, Action<FreeDReceiver, FreeDPacket> onPacket, CancellationToken token)
+    private async Task ReceiveLoopAsync(UdpClient udp, Action<FreeDReceiver, FreeDPacket> onPacket, CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
@@ -95,7 +95,7 @@ public class FreeDReceiver : MonoBehaviour
     }
 
     /// <summary>UdpClient.ReceiveAsync はキャンセルできないので、トークンが取り消されたら、ソケットを閉じて待ちを終わらせる。</summary>
-    static async Task<UdpReceiveResult> ReceiveAsync(UdpClient udp, CancellationToken token)
+    private static async Task<UdpReceiveResult> ReceiveAsync(UdpClient udp, CancellationToken token)
     {
         using (token.Register(() => udp.Close()))
         {

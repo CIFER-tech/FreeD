@@ -33,21 +33,21 @@ public class FreeDManager : MonoBehaviour
     private int _openedSignature;
     private float _rateTimerSeconds;
 
-    void OnEnable()
+    private void OnEnable()
     {
         Instance = this;
         OpenReceivers();
     }
 
-    void OnDisable()
+    private void OnDisable()
     {
         CloseReceivers();
         if (Instance == this) Instance = null;
     }
 
-    void OnDestroy() { CloseReceivers(); }
+    private void OnDestroy() { CloseReceivers(); }
 
-    void Update()
+    private void Update()
     {
         if (_isReceiverSetChanged || Signature() != _openedSignature)
         {
@@ -80,7 +80,7 @@ public class FreeDManager : MonoBehaviour
     /// <summary>FreeDReceiver が、有効・無効が変わったときに呼ぶ。次の Update で、受信を開き直す。</summary>
     internal void MarkReceiversChanged() { _isReceiverSetChanged = true; }
 
-    void OpenReceivers()
+    private void OpenReceivers()
     {
         _isReceiverSetChanged = false;
         FindEnabledReceivers();
@@ -95,7 +95,7 @@ public class FreeDManager : MonoBehaviour
         }
     }
 
-    void FindEnabledReceivers()
+    private void FindEnabledReceivers()
     {
         _foundReceivers.Clear();
 #if UNITY_2022_2_OR_NEWER
@@ -108,7 +108,7 @@ public class FreeDManager : MonoBehaviour
     }
 
     /// <summary>同じ項目を 2 つの Receiver が担当していると、合成できない。</summary>
-    bool HasOverlappedFields()
+    private bool HasOverlappedFields()
     {
         var claimed = FreeDFields.None;
         foreach (FreeDReceiver r in _foundReceivers)
@@ -124,7 +124,7 @@ public class FreeDManager : MonoBehaviour
         return false;
     }
 
-    void CloseReceivers()
+    private void CloseReceivers()
     {
         foreach (FreeDReceiver r in _openedReceivers) r.Close();
         _openedReceivers.Clear();
@@ -137,7 +137,7 @@ public class FreeDManager : MonoBehaviour
     }
 
     /// <summary>ポート・項目・本数のどれかが変わると値が変わる。再生中の設定変更で受信をやり直す目印。</summary>
-    int Signature()
+    private int Signature()
     {
         unchecked
         {
@@ -149,7 +149,7 @@ public class FreeDManager : MonoBehaviour
     }
 
     /// <summary>受信タスク (スレッドプール) から呼ばれる。</summary>
-    void OnPacket(FreeDReceiver receiver, FreeDPacket packet)
+    private void OnPacket(FreeDReceiver receiver, FreeDPacket packet)
     {
         double nowMs = _stopwatch.Elapsed.TotalMilliseconds;
         lock (_lock)
@@ -166,7 +166,7 @@ public class FreeDManager : MonoBehaviour
         }
     }
 
-    List<FreeDFields> FieldsOfOpenedReceivers()
+    private List<FreeDFields> FieldsOfOpenedReceivers()
     {
         var fields = new List<FreeDFields>();
         foreach (FreeDReceiver r in _openedReceivers) fields.Add(r.Fields);
@@ -174,7 +174,7 @@ public class FreeDManager : MonoBehaviour
     }
 
     /// <summary>_lock の中で呼ぶ。</summary>
-    void MergeAll(double nowMs)
+    private void MergeAll(double nowMs)
     {
         foreach (KeyValuePair<int, FreeDMerger> pair in _mergersByCameraId)
         {
@@ -191,7 +191,7 @@ public class FreeDManager : MonoBehaviour
     }
 
     /// <summary>_lock の中で呼ぶ。</summary>
-    void PublishReceiverStatus(double nowMs)
+    private void PublishReceiverStatus(double nowMs)
     {
         receiving = false;
         foreach (FreeDReceiverStatus status in receivers)
@@ -212,7 +212,7 @@ public class FreeDManager : MonoBehaviour
     }
 
     /// <summary>_lock の中で呼ぶ。</summary>
-    void PublishCameraStatus()
+    private void PublishCameraStatus()
     {
         foreach (KeyValuePair<int, FreeDMergedCamera> pair in _mergedByCameraId)
         {
@@ -225,7 +225,7 @@ public class FreeDManager : MonoBehaviour
     }
 
     /// <summary>cameras はカメラ ID の昇順に保つ。</summary>
-    FreeDCameraStatus FindOrAddCameraStatus(int cameraId)
+    private FreeDCameraStatus FindOrAddCameraStatus(int cameraId)
     {
         int insertIndex = 0;
         for (; insertIndex < cameras.Count; insertIndex++)

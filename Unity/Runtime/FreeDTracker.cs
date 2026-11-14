@@ -31,7 +31,7 @@ public class FreeDTracker : MonoBehaviour
     [FreeDReadOnly] public bool hasFocus;
     [Tooltip("フォーカスのエンコーダの生の値 (24bit)。FreeDLens がピント距離に直す"), FreeDReadOnly] public uint focusRaw;
 
-    void LateUpdate()
+    private void LateUpdate()
     {
         FreeDManager manager = FreeDManager.Instance;
         if (manager == null) return;
@@ -44,7 +44,7 @@ public class FreeDTracker : MonoBehaviour
         ApplyPose(filled, packet);
     }
 
-    void ApplyPose(FreeDFields filled, FreeDPacket p)
+    private void ApplyPose(FreeDFields filled, FreeDPacket p)
     {
         bool hasRotation = (filled & FreeDFields.Rotation) != 0;
         bool hasPosition = (filled & FreeDFields.Position) != 0;
@@ -69,14 +69,14 @@ public class FreeDTracker : MonoBehaviour
         if (hasRotation) transform.localRotation = uRot * Quaternion.Euler(rotationOffset);
     }
 
-    static Quaternion Rot(float pan, float tilt, float roll)
+    private static Quaternion Rot(float pan, float tilt, float roll)
     {
         return Quaternion.AngleAxis(pan, new Vector3(0, 0, 1))
              * Quaternion.AngleAxis(tilt, new Vector3(1, 0, 0))
              * Quaternion.AngleAxis(roll, new Vector3(0, 1, 0));
     }
 
-    void OnDrawGizmos()
+    private void OnDrawGizmos()
     {
         // 親が retroloc の原点。親がなければワールドの原点。
         Transform origin = transform.parent;

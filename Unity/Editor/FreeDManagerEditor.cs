@@ -24,7 +24,7 @@ public class FreeDManagerEditor : Editor
         serializedObject.ApplyModifiedProperties();
     }
 
-    static void DrawReceivers(SerializedProperty receivers)
+    private static void DrawReceivers(SerializedProperty receivers)
     {
         for (int i = 0; i < receivers.arraySize; i++)
         {
@@ -38,7 +38,7 @@ public class FreeDManagerEditor : Editor
         }
     }
 
-    static void DrawCameras(SerializedProperty cameras)
+    private static void DrawCameras(SerializedProperty cameras)
     {
         for (int i = 0; i < cameras.arraySize; i++)
         {
