@@ -7,7 +7,7 @@ using UnityEngine;
 
 /// <summary>
 /// FreeD (UDP) をポート 1 つで受信して、復号したパケットを保持するだけ。ポートごとに 1 つ置く。保持したパケットは、FreeDManager が毎フレーム取りに来る。
-/// 受信の開始・停止、合成、受信状態の集計はすべて FreeDManager が行う (FreeDManager がシーンになければ何も受信しない)。
+/// 受信の開始・停止と、毎フレームの処理は、すべて FreeDManager が行う (Unity の Awake・OnEnable・Update などは使わない。FreeDManager がシーンになければ何も受信しない)。
 /// 姿勢は retroloc のポート 40000、ズームとフォーカスはレンズエンコーダのポート 41000、のように
 /// 送り元ごとに Receiver を置き、Fields でそのポートから使う項目を選ぶ。
 /// 受信は SocketAsyncEventArgs と使い回す受信バッファで行い、パケットごとに GC を起こさない。
@@ -52,30 +52,6 @@ public class FreeDReceiver : MonoBehaviour
         }
     }
 
-    private void Update()
-    {
-        status.Update(FreeDClock.NowMs, Time.unscaledDeltaTime);
-    }
-
-    // 有効・無効が変わったことを Manager に知らせる。受信を開き直すのは Manager。
-    private void OnEnable()
-    {
-        NotifyManager();
-    }
-
-    private void OnDisable()
-    {
-        NotifyManager();
-    }
-
-    private static void NotifyManager()
-    {
-        if (FreeDManager.Instance != null)
-        {
-            FreeDManager.Instance.MarkReceiversChanged();
-        }
-    }
-
     /// <summary>FreeDManager が呼ぶ。受信を始める。復号したパケットは保持し、Manager が毎フレーム取りに来る。</summary>
     internal void Open()
     {
@@ -98,7 +74,7 @@ public class FreeDReceiver : MonoBehaviour
         ReceiveNext(_cancellation.Token);
     }
 
-    /// <summary>FreeDManager が毎フレーム呼ぶ。受信して復号したパケットを、届いた順に 1 つずつ取り出す。</summary>
+    /// <summary>FreeDManager が毎フレーム呼ぶ。受信して復号したパケットを、届いた順に 1 つずつ取り出して、受信状態に記録する。</summary>
     internal bool TryDequeue(out FreeDReceivedPacket received)
     {
         if (!_receivedPackets.TryDequeue(out received))

@@ -5,15 +5,14 @@ using UnityEngine;
 /// <summary>
 /// FreeD 受信を管理する。シーンに 1 つ置く。
 /// 有効な FreeDReceiver の受信を開始・停止し、毎フレーム各 Receiver のパケットを取りに行って、カメラ ID ごとに FreeDMerger で合成して、
-/// FreeDTracker に渡す。
+/// FreeDTracker に反映する。
+/// Receiver と Tracker の寿命と毎フレームの処理は、すべてここで行う (Receiver と Tracker は Unity の Update などを使わない)。
 /// FreeDManager がなければ、受信も反映も行われない。
 /// </summary>
 [DefaultExecutionOrder(-100)]
 [DisallowMultipleComponent]
 public class FreeDManager : MonoBehaviour
 {
-    public static FreeDManager Instance { get; private set; }
-
     // 状態の欄は FreeDManagerEditor が枠で囲んで描く (Header は付けない)
     [FreeDReadOnly] public bool receiving;
     [Tooltip("全 Receiver が直近 1 秒に受けたパケットの合計"), FreeDReadOnly]
@@ -24,24 +23,19 @@ public class FreeDManager : MonoBehaviour
     private readonly List<FreeDReceiver> _openedReceivers = new List<FreeDReceiver>();
     private readonly Dictionary<int, FreeDMerger> _mergersByCameraId = new Dictionary<int, FreeDMerger>();
     private readonly Dictionary<int, FreeDMergedCamera> _mergedByCameraId = new Dictionary<int, FreeDMergedCamera>();
-    // シーンから見つけた有効な Receiver。項目の重なりなどで開けなかったものも含む。
+    // シーンから見つけた Receiver (無効なものも含む)。有効・無効の切り替えを、Signature で見つける。
     private readonly List<FreeDReceiver> _foundReceivers = new List<FreeDReceiver>();
-    private bool _isReceiverSetChanged;
+    private readonly List<FreeDTracker> _foundTrackers = new List<FreeDTracker>();
     private int _openedSignature;
 
     private void OnEnable()
     {
-        Instance = this;
         StartReceiving();
     }
 
     private void OnDisable()
     {
         StopReceiving();
-        if (Instance == this)
-        {
-            Instance = null;
-        }
     }
 
     private void OnDestroy()
@@ -51,7 +45,7 @@ public class FreeDManager : MonoBehaviour
 
     private void Update()
     {
-        if (_isReceiverSetChanged || Signature() != _openedSignature)
+        if (Signature() != _openedSignature)
         {
             StopReceiving();
             StartReceiving();
@@ -64,38 +58,31 @@ public class FreeDManager : MonoBehaviour
         totalPacketsPerSecond = 0;
         foreach (FreeDReceiver receiver in _openedReceivers)
         {
+            receiver.status.Update(FreeDClock.NowMs, Time.unscaledDeltaTime);
             receiving |= receiver.status.isReceiving;
             totalPacketsPerSecond += receiver.status.packetsPerSecond;
         }
-    }
 
-    /// <summary>カメラ ID のデータを合成した値を取る。その ID のパケットがまだ 1 つも届いていないときは false。</summary>
-    /// <param name="filled">1 度でも値が入った項目。含まれない項目は packet の中身を使ってはいけない。</param>
-    public bool TryGet(int cameraId, out FreeDFields filled, out FreeDPacket packet, out bool isReceiving)
-    {
-        if (_mergedByCameraId.TryGetValue(cameraId, out FreeDMergedCamera merged))
+        foreach (FreeDTracker tracker in _foundTrackers)
         {
-            filled = merged.filled;
-            packet = merged.packet;
-            isReceiving = merged.isReceiving;
-            return true;
+            if (tracker == null || !tracker.isActiveAndEnabled)
+            {
+                continue;
+            }
+            if (_mergedByCameraId.TryGetValue(tracker.cameraId, out FreeDMergedCamera merged))
+            {
+                tracker.Apply(merged.filled, merged.packet, merged.isReceiving);
+            }
+            else
+            {
+                tracker.receiving = false;
+            }
         }
-        filled = FreeDFields.None;
-        packet = default;
-        isReceiving = false;
-        return false;
-    }
-
-    /// <summary>FreeDReceiver が、有効・無効が変わったときに呼ぶ。次の Update で、受信を開き直す。</summary>
-    internal void MarkReceiversChanged()
-    {
-        _isReceiverSetChanged = true;
     }
 
     private void StartReceiving()
     {
-        _isReceiverSetChanged = false;
-        FindEnabledReceivers();
+        FindReceiversAndTrackers();
         _openedSignature = Signature();
         if (HasOverlappedFields())
         {
@@ -104,6 +91,10 @@ public class FreeDManager : MonoBehaviour
 
         foreach (FreeDReceiver receiver in _foundReceivers)
         {
+            if (!receiver.isActiveAndEnabled)
+            {
+                continue;
+            }
             _openedReceivers.Add(receiver);
             receiver.Open();
         }
@@ -123,21 +114,18 @@ public class FreeDManager : MonoBehaviour
         totalPacketsPerSecond = 0;
     }
 
-    private void FindEnabledReceivers()
+    /// <summary>シーンの Receiver と Tracker を探す。無効なものも含める (あとで有効になったら、受信を開き直す)。</summary>
+    private void FindReceiversAndTrackers()
     {
         _foundReceivers.Clear();
+        _foundTrackers.Clear();
 #if UNITY_2022_2_OR_NEWER
-        FreeDReceiver[] all = FindObjectsByType<FreeDReceiver>(FindObjectsSortMode.InstanceID);
+        _foundReceivers.AddRange(FindObjectsByType<FreeDReceiver>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
+        _foundTrackers.AddRange(FindObjectsByType<FreeDTracker>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
 #else
-        FreeDReceiver[] all = FindObjectsOfType<FreeDReceiver>();
+        _foundReceivers.AddRange(FindObjectsOfType<FreeDReceiver>(true));
+        _foundTrackers.AddRange(FindObjectsOfType<FreeDTracker>(true));
 #endif
-        foreach (FreeDReceiver receiver in all)
-        {
-            if (receiver.isActiveAndEnabled)
-            {
-                _foundReceivers.Add(receiver);
-            }
-        }
     }
 
     /// <summary>同じ項目を 2 つの Receiver が担当していると、合成できない。</summary>
@@ -146,6 +134,10 @@ public class FreeDManager : MonoBehaviour
         var claimed = FreeDFields.None;
         foreach (FreeDReceiver receiver in _foundReceivers)
         {
+            if (!receiver.isActiveAndEnabled)
+            {
+                continue;
+            }
             FreeDFields overlapped = claimed & receiver.Fields;
             if (overlapped != FreeDFields.None)
             {
@@ -157,7 +149,7 @@ public class FreeDManager : MonoBehaviour
         return false;
     }
 
-    /// <summary>ポート・項目・本数のどれかが変わると値が変わる。再生中の設定変更で受信をやり直す目印。</summary>
+    /// <summary>ポート・項目・本数・有効か無効かのどれかが変わると値が変わる。再生中の設定変更で受信をやり直す目印。</summary>
     private int Signature()
     {
         unchecked
@@ -166,6 +158,7 @@ public class FreeDManager : MonoBehaviour
             foreach (FreeDReceiver receiver in _foundReceivers)
             {
                 hash = hash * 31 + receiver.port * 31 + (int)receiver.Fields;
+                hash = hash * 31 + (receiver.isActiveAndEnabled ? 1 : 0);
             }
             return hash;
         }
@@ -174,9 +167,9 @@ public class FreeDManager : MonoBehaviour
     /// <summary>各 Receiver が保持しているパケットを、届いた順にすべて取り出して、カメラ ID ごとの Merger に渡す。</summary>
     private void PollReceivers()
     {
-        for (int receiverIndex = 0; receiverIndex < _openedReceivers.Count; receiverIndex++)
+        for (var i = 0; i < _openedReceivers.Count; i++)
         {
-            while (_openedReceivers[receiverIndex].TryDequeue(out FreeDReceivedPacket received))
+            while (_openedReceivers[i].TryDequeue(out var received))
             {
                 int cameraId = received.packet.CameraId;
                 if (!_mergersByCameraId.TryGetValue(cameraId, out FreeDMerger merger))
@@ -189,12 +182,12 @@ public class FreeDManager : MonoBehaviour
                     merger = new FreeDMerger(fields);
                     _mergersByCameraId[cameraId] = merger;
                 }
-                merger.Put(receiverIndex, received.packet, received.receivedMs);
+                merger.Put(i, received.packet, received.receivedMs);
             }
         }
     }
 
-    /// <summary>カメラ ID ごとに、遅延を過ぎたパケットを合成して、Tracker が TryGet で読める値にする。Inspector に出す状態も更新する。</summary>
+    /// <summary>カメラ ID ごとに、遅延を過ぎたパケットを合成して、Tracker に渡す値にする。Inspector に出す状態も更新する。</summary>
     private void MergeAll(double nowMs)
     {
         foreach (KeyValuePair<int, FreeDMerger> pair in _mergersByCameraId)

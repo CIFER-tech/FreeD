@@ -2,7 +2,8 @@ using FreeD;
 using UnityEngine;
 
 /// <summary>
-/// FreeDManager からカメラ ID を指定して FreeD の値を受け取り、このオブジェクトの位置と向きに反映する。
+/// カメラ ID を指定して、FreeDManager が合成した FreeD の値を受け取り、このオブジェクトの位置と向きに反映する。
+/// 反映は FreeDManager が毎フレーム行う (Unity の Update などは使わない)。
 /// 親オブジェクトが retroloc の原点になる。親の Position と Rotation の Y が、retroloc の原点の位置と水平の向きになる。
 /// Scene ビューの青い矢印 (前) が retroloc の Y 方向、赤い矢印 (右) が X 方向。
 /// retroloc のワールド (X=右, Y=前, Z=上, m) を Unity に変換する。
@@ -33,24 +34,10 @@ public class FreeDTracker : MonoBehaviour
     [FreeDReadOnly] public bool hasFocus;
     [Tooltip("フォーカスのエンコーダの生の値 (24bit)。FreeDLens がピント距離に直す"), FreeDReadOnly] public uint focusRaw;
 
-    private void LateUpdate()
+    /// <summary>FreeDManager が毎フレーム呼ぶ。合成した値を、このオブジェクトの位置と向きに反映する。</summary>
+    internal void Apply(FreeDFields filled, FreeDPacket p, bool isReceiving)
     {
-        FreeDManager manager = FreeDManager.Instance;
-        if (manager == null)
-        {
-            return;
-        }
-        if (!manager.TryGet(cameraId, out FreeDFields filled, out FreeDPacket packet, out bool isReceiving))
-        {
-            receiving = false;
-            return;
-        }
         receiving = isReceiving;
-        ApplyPose(filled, packet);
-    }
-
-    private void ApplyPose(FreeDFields filled, FreeDPacket p)
-    {
         bool hasRotation = (filled & FreeDFields.Rotation) != 0;
         bool hasPosition = (filled & FreeDFields.Position) != 0;
         if ((filled & FreeDFields.Zoom) != 0)
