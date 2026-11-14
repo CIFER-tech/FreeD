@@ -26,10 +26,18 @@ namespace CIFER.tech.FreeD.Core
         public const int PacketLength = 29;
         public const byte MessageTypeD1 = 0xD1;
 
-        private const double AngleScale = 32768.0;          // 1/32768 度
-        private const double PositionScale = 64.0 * 1000.0; // 1/64 mm → m あたり 64000
-        private const int Signed24Min = -8388608;
-        private const int Signed24Max = 8388607;
+        /// <summary>角度 1 度あたりの生の値 (1/32768 度単位)。</summary>
+        public const double AngleScale = 32768.0;
+
+        /// <summary>位置 1 m あたりの生の値 (1/64 mm 単位なので 64000)。</summary>
+        public const double PositionScale = 64.0 * 1000.0;
+
+        /// <summary>角度・位置の生の値の最小 (24bit 符号付き)。</summary>
+        public const int Signed24Min = -8388608;
+
+        /// <summary>角度・位置の生の値の最大 (24bit 符号付き)。</summary>
+        public const int Signed24Max = 8388607;
+
         /// <summary>ズーム・フォーカスの生の値の最大 (24bit 符号なし)。</summary>
         public const uint Unsigned24Max = 0xFFFFFF;
 
