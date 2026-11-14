@@ -25,6 +25,9 @@ namespace CIFER.tech.FreeD.Unity
             trackers.AddRange(FindObjectsOfType<FreeDTracker>(true));
 #endif
 
+            // 控えとして無効にしてある Receiver は、受信にも項目の重なりの検査にも使わない。
+            receivers.RemoveAll(receiver => !receiver.isActiveAndEnabled);
+
             foreach (var receiver in receivers)
             {
                 // ポートを開けない Receiver があっても、残りの Receiver は開く。

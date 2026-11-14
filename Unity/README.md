@@ -44,7 +44,7 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 
 3 つのコンポーネントに分かれている。
 
-- `FreeDManager`: シーンに 1 つ置く。受信の開始・停止と、カメラ ID ごとの合成をすべて管理する。シーンになければ、受信も反映も行われない。
+- `FreeDManager`: シーンに 1 つ置く。受信の開始・停止と、カメラ ID ごとの合成をすべて管理する。シーンになければ、受信も反映も行われない。再生を始めたときに無効な `FreeDReceiverForUnity` は、対象にならない (控えの Receiver は無効にして置く)。
 - `FreeDReceiverForUnity`: ポート 1 つで受信するだけ (受信そのものは Core の `FreeDReceiver` が行う)。送信元のポートごとに 1 つ置く。
 - `FreeDTracker`: カメラ ID を指定して値を受け取り、自分のオブジェクトの位置・向きに反映する。親のオブジェクトが FreeD 座標の原点になる。
 
