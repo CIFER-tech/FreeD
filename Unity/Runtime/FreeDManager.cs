@@ -22,8 +22,6 @@ public class FreeDManager : MonoBehaviour
     private bool _isFieldsOverlapped;
 
     private readonly Dictionary<int, FreeDMerger> _mergersByCameraId = new Dictionary<int, FreeDMerger>();
-    // 値が 1 つも入っていない ID は入れない (Tracker に渡さない)。
-    private readonly Dictionary<int, FreeDPacket> _mergedPacketsByCameraId = new Dictionary<int, FreeDPacket>();
 
     private void OnEnable()
     {
@@ -51,7 +49,6 @@ public class FreeDManager : MonoBehaviour
             receiver.Close();
         }
         _mergersByCameraId.Clear();
-        _mergedPacketsByCameraId.Clear();
     }
 
     private void Update()
@@ -82,7 +79,6 @@ public class FreeDManager : MonoBehaviour
         if (isFieldsChanged)
         {
             _mergersByCameraId.Clear();
-            _mergedPacketsByCameraId.Clear();
 
             // FreeDMerger は同じ項目を 2 つのストリームが担当すると合成できないので、重なっていたら合成しない。
             var claimedFields = FreeDFields.None;
@@ -129,18 +125,19 @@ public class FreeDManager : MonoBehaviour
                 merger.SetDelay(streamIndex, _receivers[streamIndex].delayMs);
             }
 
+            // 値が 1 つも入っていない ID は、Tracker に渡さない。
             FreeDFields filledFields = merger.Update(nowMs, out FreeDPacket merged);
-            if (filledFields != FreeDFields.None)
+            if (filledFields == FreeDFields.None)
             {
-                _mergedPacketsByCameraId[cameraIdAndMerger.Key] = merged;
+                continue;
             }
-        }
 
-        foreach (FreeDTracker tracker in _trackers)
-        {
-            if (tracker != null && tracker.isActiveAndEnabled && _mergedPacketsByCameraId.TryGetValue(tracker.cameraId, out FreeDPacket merged))
+            foreach (FreeDTracker tracker in _trackers)
             {
-                tracker.Apply(merged);
+                if (tracker != null && tracker.isActiveAndEnabled && tracker.cameraId == cameraIdAndMerger.Key)
+                {
+                    tracker.Apply(merged);
+                }
             }
         }
     }
