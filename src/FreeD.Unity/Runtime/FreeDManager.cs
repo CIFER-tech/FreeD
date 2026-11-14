@@ -10,7 +10,7 @@ namespace CIFER.tech.FreeD.Unity
     {
         private readonly List<FreeDReceiverForUnity> receivers = new();
         private readonly List<FreeDTracker> trackers = new();
-        private readonly Dictionary<int, (FreeDPacket packet, FreeDField fields)> mergedByCameraId = new();
+        private readonly Dictionary<int, FreeDMergedCamera> mergedByCameraId = new();
 
         private void OnEnable()
         {
@@ -69,12 +69,15 @@ namespace CIFER.tech.FreeD.Unity
                 while (receiver.TryTakeNext(out var packet))
                 {
                     var cameraId = packet.packet.CameraId;
-                    mergedByCameraId.TryGetValue(cameraId, out var merged);
+                    if (!mergedByCameraId.TryGetValue(cameraId, out var merged))
+                    {
+                        merged = new FreeDMergedCamera();
+                        mergedByCameraId[cameraId] = merged;
+                    }
 
                     // この Receiver の担当項目だけを新しい値にし、残りは今までの値を保つ。
                     merged.packet = FreeDMerger.Merge(merged.packet, ~receiver.Field, packet.packet, receiver.Field);
                     merged.fields |= receiver.Field;
-                    mergedByCameraId[cameraId] = merged;
                 }
             }
 
