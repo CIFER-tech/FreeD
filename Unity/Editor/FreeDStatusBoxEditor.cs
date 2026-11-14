@@ -6,6 +6,15 @@ public abstract class FreeDStatusBoxEditor : Editor
 {
     protected abstract string[] StatusPropertyNames { get; }
 
+    /// <summary>通常の描画から外すプロパティ。入れ子の状態 (status.xxx) は、親の status ごと外す。</summary>
+    protected virtual string[] ExcludedPropertyNames
+    {
+        get
+        {
+            return StatusPropertyNames;
+        }
+    }
+
     public override void OnInspectorGUI()
     {
         serializedObject.Update();
@@ -13,9 +22,10 @@ public abstract class FreeDStatusBoxEditor : Editor
         using (new EditorGUI.DisabledScope(true))
             EditorGUILayout.PropertyField(serializedObject.FindProperty("m_Script"));
 
-        var excluded = new string[StatusPropertyNames.Length + 1];
+        string[] excludedNames = ExcludedPropertyNames;
+        var excluded = new string[excludedNames.Length + 1];
         excluded[0] = "m_Script";
-        StatusPropertyNames.CopyTo(excluded, 1);
+        excludedNames.CopyTo(excluded, 1);
         DrawPropertiesExcluding(serializedObject, excluded);
 
         EditorGUILayout.Space();

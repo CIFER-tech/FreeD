@@ -18,10 +18,9 @@ public class FreeDManager : MonoBehaviour
     [FreeDReadOnly] public bool receiving;
     [Tooltip("全 Receiver が直近 1 秒に受けたパケットの合計"), FreeDReadOnly]
     public int totalPacketsPerSecond;
-    public List<FreeDReceiverStatus> receivers = new List<FreeDReceiverStatus>();
     public List<FreeDCameraStatus> cameras = new List<FreeDCameraStatus>();
 
-    // 受信を開いた Receiver。FreeDMerger の streamIndex と receivers の添字は、この並びと同じ。
+    // 受信を開いた Receiver。FreeDMerger の streamIndex は、この並びの添字。
     private readonly List<FreeDReceiver> _openedReceivers = new List<FreeDReceiver>();
     private readonly Dictionary<int, FreeDMerger> _mergersByCameraId = new Dictionary<int, FreeDMerger>();
     private readonly Dictionary<int, FreeDMergedCamera> _mergedByCameraId = new Dictionary<int, FreeDMergedCamera>();
@@ -31,7 +30,6 @@ public class FreeDManager : MonoBehaviour
     private readonly List<FreeDPolledPacket> _polledPackets = new List<FreeDPolledPacket>();
     private bool _isReceiverSetChanged;
     private int _openedSignature;
-    private float _rateTimerSeconds;
 
     private void OnEnable()
     {
@@ -64,9 +62,8 @@ public class FreeDManager : MonoBehaviour
         double nowMs = FreeDClock.NowMs;
         PollReceivers();
         PutPolledPacketsToMergers();
-        RecordPolledPackets();
         MergeAll(nowMs);
-        UpdateReceiverStatus(nowMs);
+        UpdateReceiverSummary();
         UpdateCameraStatus();
     }
 
@@ -120,7 +117,6 @@ public class FreeDManager : MonoBehaviour
     private void OpenReceiver(FreeDReceiver receiver)
     {
         _openedReceivers.Add(receiver);
-        receivers.Add(new FreeDReceiverStatus { port = receiver.port });
         receiver.Open();
     }
 
@@ -138,7 +134,6 @@ public class FreeDManager : MonoBehaviour
         _polledPackets.Clear();
         _mergersByCameraId.Clear();
         _mergedByCameraId.Clear();
-        receivers.Clear();
         cameras.Clear();
         receiving = false;
         totalPacketsPerSecond = 0;
@@ -224,15 +219,6 @@ public class FreeDManager : MonoBehaviour
         }
     }
 
-    /// <summary>取り出したパケットを、Receiver ごとの受信状態に記録する。</summary>
-    private void RecordPolledPackets()
-    {
-        foreach (FreeDPolledPacket polled in _polledPackets)
-        {
-            receivers[polled.receiverIndex].RecordPacket(polled.received.receivedMs);
-        }
-    }
-
     private FreeDMerger GetOrCreateMerger(int cameraId)
     {
         if (!_mergersByCameraId.TryGetValue(cameraId, out FreeDMerger merger))
@@ -292,37 +278,16 @@ public class FreeDManager : MonoBehaviour
 
     // ---- 状態の集計 (Inspector に出す値) ----
 
-    private void UpdateReceiverStatus(double nowMs)
-    {
-        UpdateIsReceiving(nowMs);
-        PublishRatesEverySecond();
-    }
-
-    private void UpdateIsReceiving(double nowMs)
+    /// <summary>各 Receiver の受信状態から、全体の受信中と合計 pkt/s を集める。</summary>
+    private void UpdateReceiverSummary()
     {
         receiving = false;
-        foreach (FreeDReceiverStatus status in receivers)
-        {
-            status.UpdateIsReceiving(nowMs);
-            receiving |= status.isReceiving;
-        }
-    }
-
-    private void PublishRatesEverySecond()
-    {
-        _rateTimerSeconds += Time.unscaledDeltaTime;
-        if (_rateTimerSeconds < 1f)
-        {
-            return;
-        }
-
         totalPacketsPerSecond = 0;
-        foreach (FreeDReceiverStatus status in receivers)
+        foreach (FreeDReceiver receiver in _openedReceivers)
         {
-            status.PublishRates(_rateTimerSeconds);
-            totalPacketsPerSecond += status.packetsPerSecond;
+            receiving |= receiver.status.isReceiving;
+            totalPacketsPerSecond += receiver.status.packetsPerSecond;
         }
-        _rateTimerSeconds = 0f;
     }
 
     private void UpdateCameraStatus()

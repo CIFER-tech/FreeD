@@ -30,6 +30,9 @@ public class FreeDReceiver : MonoBehaviour
     [Tooltip("ms。他のポートより早く届くときに、この分だけ反映を遅らせてそろえる")]
     public float delayMs = 0f;
 
+    // 状態の欄は FreeDReceiverEditor が枠で囲んで描く
+    public FreeDReceiverStatus status = new FreeDReceiverStatus();
+
     private readonly byte[] _receiveBuffer = new byte[ReceiveBufferSize];
     // 受信が積み、FreeDManager が Update で取り出す。
     private readonly FreeDReceivedPacketQueue _receivedPackets = new FreeDReceivedPacketQueue();
@@ -47,6 +50,11 @@ public class FreeDReceiver : MonoBehaviour
         {
             fields = value;
         }
+    }
+
+    private void Update()
+    {
+        status.Update(FreeDClock.NowMs, Time.unscaledDeltaTime);
     }
 
     // 有効・無効が変わったことを Manager に知らせる。受信を開き直すのは Manager。
@@ -93,7 +101,12 @@ public class FreeDReceiver : MonoBehaviour
     /// <summary>FreeDManager が毎フレーム呼ぶ。受信して復号したパケットを、届いた順に 1 つずつ取り出す。</summary>
     internal bool TryDequeue(out FreeDReceivedPacket received)
     {
-        return _receivedPackets.TryDequeue(out received);
+        if (!_receivedPackets.TryDequeue(out received))
+        {
+            return false;
+        }
+        status.RecordPacket(received.receivedMs);
+        return true;
     }
 
     /// <summary>FreeDManager が呼ぶ。受信を止めてポートを閉じる。</summary>
@@ -117,6 +130,7 @@ public class FreeDReceiver : MonoBehaviour
             _cancellation = null;
         }
         _receivedPackets.Clear();
+        status.Reset();
     }
 
     private void DisposeSocket()
