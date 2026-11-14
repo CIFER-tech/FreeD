@@ -4,6 +4,7 @@
 
 - `FreeDReceiver` のストリームで、使う項目を 4 つのチェックボックスから、複数選べるドロップダウン (`fields`) に変更。1.3.0 までのシーンのチェックは自動で移る。
 - 状態の欄を、編集できない表示だけの欄にした (Editor 用のアセンブリ `FreeD.Unity.Editor` を追加)。`FreeDReceiver`・各ストリーム・`FreeDLens` の状態の欄は、枠で囲んでまとめた (見出しは付けない)。
+- `FreeDOrigin` の `originMarker` を廃止。原点は `FreeDOrigin` 自身の Position と Rotation の Y で決める。
 - `FreeDReceiver` の `pan`/`tilt`/`roll` と `xMm`/`yMm`/`zMm` を、`panTiltRollDeg` と `positionMm` (どちらも Vector3) にまとめた。`zoomRaw` を `hasZoom` の下、`focusRaw` を `hasFocus` の下に並べた。
 
 ## [1.3.0] - 2026-10-30
