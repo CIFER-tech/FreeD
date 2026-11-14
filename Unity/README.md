@@ -48,8 +48,8 @@ Unity のカメラ (または任意のオブジェクト) に `FreeDReceiver` �
 
 姿勢は retroloc、ズームとフォーカスは別のシステム、のように別々の FreeD ストリームで届くときは、`Streams` にストリームを足して、ポートごとに使う項目を選ぶ。
 
-1. `Streams` を 2 本にする。1 本目: `Port` 40000、`Rotation` と `Position` だけチェック。2 本目: `Port` 41000、`Zoom` と `Focus` だけチェック。
-2. 同じ項目は 1 つのストリームだけが使える。チェックすると、他のストリームのチェックが外れる。
+1. `Streams` を 2 本にする。1 本目: `Port` 40000、`Fields` で `Rotation` と `Position` だけ選ぶ。2 本目: `Port` 41000、`Fields` で `Zoom` と `Focus` だけ選ぶ。
+2. 同じ項目は 1 つのストリームだけが使える。選ぶと、他のストリームの選択が外れる。
 3. 項目ごとに、そのストリームで最後に届いた値を使う。途切れても値は保たれ、左上の表示でそのストリームが「途切れ」になる。
 4. 映像とのずれは、早く届く側のストリームの `Delay Ms` で合わせる (その分だけ反映を遅らせる)。
 5. ズームとフォーカスの生の値 (24bit) は `zoomRaw` / `focusRaw` に出る。カメラに反映するには、同じオブジェクトに `FreeDLens` を付け、AnimationCurve に対応を入れる (横軸 = 生の値、縦軸 = 焦点距離 mm / ピント距離 m)。焦点距離は Physical Camera に入る。ピント距離は Unity 2022.2 以降で `Camera.focusDistance` にも入り、`FreeDLens.focusDistanceM` からも読める。

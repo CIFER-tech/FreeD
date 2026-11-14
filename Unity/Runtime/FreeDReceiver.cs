@@ -19,46 +19,54 @@ using UnityEngine.Serialization;
 public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
 {
     [Serializable]
-    public class Stream
+    public class Stream : ISerializationCallbackReceiver
     {
         [Tooltip("送信側の FreeD送信 のポートと同じにする")]
         public int port = 40000;
         [Tooltip("0 = 全カメラ")]
         public int cameraId = 0;
 
-        [Header("このストリームから使う項目 (同じ項目は 1 つのストリームだけ)")]
-        public bool rotation = true;
-        public bool position = true;
-        public bool zoom = true;
-        public bool focus = true;
+        [Tooltip("このストリームから使う項目 (同じ項目は 1 つのストリームだけ)")]
+        public FreeDFields fields = AllFields;
 
         [Tooltip("ms。他のストリームより早く届くときに、この分だけ反映を遅らせてそろえる")]
         public float delayMs = 0f;
 
         [Header("状態 (読み取り専用)")]
-        public bool receiving;
-        public int packetsPerSecond;
-        [Tooltip("直近1秒の受信間隔 (ms)")]
+        [FreeDReadOnly] public bool receiving;
+        [FreeDReadOnly] public int packetsPerSecond;
+        [Tooltip("直近1秒の受信間隔 (ms)"), FreeDReadOnly]
         public float meanIntervalMs, maxIntervalMs;
 
         // 受信スレッドが書き、Update が読む。FreeDReceiver の _lock で守る。
         [NonSerialized] internal int count;
         [NonSerialized] internal double sumIntervalMs, maxIntervalMsSoFar, lastReceivedMs = -1;
 
+        // Everything を選ぶと全ビットが立った -1 になるので、項目のビットだけに絞って返す。
+        private const FreeDFields AllFields = FreeDFields.Rotation | FreeDFields.Position | FreeDFields.Zoom | FreeDFields.Focus;
+
         public FreeDFields Fields
         {
-            get
-            {
-                return (rotation ? FreeDFields.Rotation : 0) | (position ? FreeDFields.Position : 0)
-                     | (zoom ? FreeDFields.Zoom : 0) | (focus ? FreeDFields.Focus : 0);
-            }
-            set
-            {
-                rotation = (value & FreeDFields.Rotation) != 0;
-                position = (value & FreeDFields.Position) != 0;
-                zoom = (value & FreeDFields.Zoom) != 0;
-                focus = (value & FreeDFields.Focus) != 0;
-            }
+            get { return fields & AllFields; }
+            set { fields = value; }
+        }
+
+        // 1.3 までの設定 (項目ごとのチェックボックス)。fields を持たない古いシーンを読んだときに fields へ移す。
+        // 古い値は _isFieldsSet が false のときだけ使うので、新しく作ったストリームでは既定の全項目 (true) のまま fields になる。
+        [SerializeField, HideInInspector, FormerlySerializedAs("rotation")] private bool _legacyRotation = true;
+        [SerializeField, HideInInspector, FormerlySerializedAs("position")] private bool _legacyPosition = true;
+        [SerializeField, HideInInspector, FormerlySerializedAs("zoom")] private bool _legacyZoom = true;
+        [SerializeField, HideInInspector, FormerlySerializedAs("focus")] private bool _legacyFocus = true;
+        [SerializeField, HideInInspector] private bool _isFieldsSet;
+
+        public void OnBeforeSerialize() { _isFieldsSet = true; }
+
+        public void OnAfterDeserialize()
+        {
+            if (_isFieldsSet) return;
+            fields = (_legacyRotation ? FreeDFields.Rotation : 0) | (_legacyPosition ? FreeDFields.Position : 0)
+                   | (_legacyZoom ? FreeDFields.Zoom : 0) | (_legacyFocus ? FreeDFields.Focus : 0);
+            _isFieldsSet = true;
         }
     }
 
@@ -77,12 +85,12 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
     public Vector3 rotationOffset = Vector3.zero;
 
     [Header("状態 (読み取り専用)")]
-    public bool receiving;
-    public double pan, tilt, roll;
-    public double xMm, yMm, zMm;
+    [FreeDReadOnly] public bool receiving;
+    [FreeDReadOnly] public double pan, tilt, roll;
+    [FreeDReadOnly] public double xMm, yMm, zMm;
     [Tooltip("ズーム・フォーカスのエンコーダの生の値 (24bit)。FreeDLens が焦点距離とピント距離に直す")]
-    public uint zoomRaw, focusRaw;
-    public bool hasZoom, hasFocus;
+    [FreeDReadOnly] public uint zoomRaw, focusRaw;
+    [FreeDReadOnly] public bool hasZoom, hasFocus;
 
     // 1.2 までの設定 (ストリームが 1 本だけだった)。読み込んだときに streams の 1 本目へ移す。
     [SerializeField, HideInInspector, FormerlySerializedAs("port")] private int _legacyPort = -1;

@@ -1,6 +1,6 @@
 {
   "name": "tech.cifer.freed",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "displayName": "FreeD",
   "description": "FreeD (D1, 29 バイト) メッセージの符号化・復号ライブラリ。カメラトラッキングデータ (パン/チルト/ロール/位置/ズーム/フォーカス) をUDP等で送受信する際のパケットを扱う。",
   "unity": "2021.2",
