@@ -55,7 +55,7 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 | 役割 | コンポーネント | 持つもの |
 | --- | --- | --- |
 | Model | `FreeDReceiver` | ポートで受信した値と、その受信状態。ほかを知らない |
-| View | `FreeDTracker`、`FreeDLens` | 受け取った値の表示 (カメラの位置・向き・レンズ)。ほかを知らない |
+| View | `FreeDTracker` | 受け取った値の表示 (カメラの位置・向き・レンズ)。ほかを知らない |
 | Presenter | `FreeDManager` | Model と View の寿命、毎フレームの取り出し・合成・反映 |
 
 Model と View は、Unity の `Awake`・`OnEnable`・`Update` などを使わない。動かすのは Presenter だけで、Model と View は互いを参照しない。
@@ -69,7 +69,7 @@ Model と View は、Unity の `Awake`・`OnEnable`・`Update` などを使わ�
 3. 項目ごとに、その Receiver で最後に届いた値を使う。途切れても値は保たれ、Receiver の状態で、そのポートが途切れ (`Is Receiving` が false) になる。
 4. 映像とのずれは、早く届く側の Receiver の `Delay Ms` で合わせる (その分だけ反映を遅らせる)。
 5. 合成はカメラ ID ごとに行う。姿勢とレンズを 1 台のカメラにまとめるには、どちらのシステムも同じカメラ ID で送る。
-6. ズームとフォーカスの生の値 (24bit) は `FreeDTracker` の `zoomRaw` / `focusRaw` に出る。カメラに反映するには、Tracker と同じオブジェクトに `FreeDLens` を付け、AnimationCurve に対応を入れる (横軸 = 生の値、縦軸 = 焦点距離 mm / ピント距離 m)。焦点距離は Physical Camera に入る。ピント距離は Unity 2022.2 以降で `Camera.focusDistance` にも入り、`FreeDLens.focusDistanceM` からも読める。
+6. ズームとフォーカスの生の値 (24bit) は `FreeDTracker` の `zoomRaw` / `focusRaw` に出る。カメラに反映するには、`FreeDTracker` の AnimationCurve に対応を入れる (横軸 = 生の値、縦軸 = 焦点距離 mm / ピント距離 m)。キーのない曲線は反映しない。焦点距離は Physical Camera に入る。ピント距離は Unity 2022.2 以降で `Camera.focusDistance` にも入り、`FreeDTracker.focusDistanceM` からも読める。
 
 2.0.0 より前のシーン (カメラに `FreeDReceiver` を付けていたもの) は、上の手順で組み直す。
 

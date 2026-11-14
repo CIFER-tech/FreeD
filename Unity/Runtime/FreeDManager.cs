@@ -6,7 +6,7 @@ using UnityEngine;
 /// FreeD 受信を管理する。シーンに 1 つ置く。
 /// 有効な FreeDReceiver の受信を開始・停止し、毎フレーム各 Receiver のパケットを取りに行って、カメラ ID ごとに FreeDMerger で合成して、
 /// FreeDTracker に反映する。
-/// MVP の Presenter。Model (FreeDReceiver) と View (FreeDTracker、FreeDLens) は、互いを知らず、寿命と毎フレームの処理をすべてここで行う
+/// MVP の Presenter。Model (FreeDReceiver) と View (FreeDTracker) は、互いを知らず、寿命と毎フレームの処理をすべてここで行う
 /// (Receiver と Tracker は Unity の Update などを使わない)。
 /// FreeDManager がなければ、受信も反映も行われない。
 /// </summary>
@@ -73,7 +73,8 @@ public class FreeDManager : MonoBehaviour
             }
             if (_mergedPacketsByCameraId.TryGetValue(tracker.cameraId, out FreeDPacket merged))
             {
-                tracker.Apply(merged, FindOrAddCameraStatus(tracker.cameraId).isReceiving);
+                tracker.receiving = FindOrAddCameraStatus(tracker.cameraId).isReceiving;
+                tracker.Apply(merged);
             }
             else
             {
@@ -128,10 +129,6 @@ public class FreeDManager : MonoBehaviour
         _foundReceivers.AddRange(FindObjectsOfType<FreeDReceiver>(true));
         _foundTrackers.AddRange(FindObjectsOfType<FreeDTracker>(true));
 #endif
-        foreach (FreeDTracker tracker in _foundTrackers)
-        {
-            tracker.lens = tracker.GetComponent<FreeDLens>();
-        }
     }
 
     /// <summary>同じ項目を 2 つの Receiver が担当していると、合成できない。</summary>

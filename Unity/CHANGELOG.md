@@ -10,9 +10,9 @@
   - Receiver と Tracker は、Unity の `Awake`・`OnEnable`・`Update` などを使わない。寿命と毎フレームの処理は、すべて Manager が行う (Manager は Receiver と Tracker を、開始時にシーンから探す。あとから置いたものは、再生を始め直すまで対象にならない)。
   - `FreeDTracker` (新規): `cameraId` を指定して値を受け取り、自分のオブジェクトの位置・向きに反映する。`rotationScale` (旧 `panSign` / `tiltSign` / `rollSign`。符号ではなく倍率としてかけているので改名)・`positionScale` (新規。位置にかける倍率)・`positionOffset` / `rotationOffset` を持つ。
 - `FreeDOrigin` を廃止。`FreeDTracker` の親のオブジェクトが原点になる。親の Position と Rotation の Y で、原点の位置と向きを決める。
-- `FreeDLens` を、`FreeDTracker` と同じオブジェクトに付ける形にした。
+- `FreeDLens` を廃止し、ズーム・フォーカスの AnimationCurve と焦点距離・ピント距離の反映を `FreeDTracker` に統合した。
 - 使う項目を、4 つのチェックボックスから、複数選べるドロップダウン (`FreeDFields`) に変更。並びは Position・Rotation・Zoom・Focus。
-- 状態の欄を、編集できない表示だけの欄にし、枠で囲んだ (Editor 用のアセンブリ `FreeD.Unity.Editor` を追加)。`pan`/`tilt`/`roll` と `xMm`/`yMm`/`zMm` は、Vector3 の `panTiltRollDeg` と `positionMm` にまとめた。`hasZoom`/`hasFocus` は廃止。
+- 状態の欄を、編集できない表示だけの欄にし、枠で囲んだ (Editor 用のアセンブリ `FreeD.Unity.Editor` を追加)。`pan`/`tilt`/`roll` と `xMm`/`yMm`/`zMm` は、Vector3 の `rotation` (度) と `position` (m) にまとめた。`hasZoom`/`hasFocus` は廃止。
 - 再生中の左上の表示 (OnGUI) を廃止。状態は Inspector で見る。
 
 ## [1.3.0] - 2026-10-30
