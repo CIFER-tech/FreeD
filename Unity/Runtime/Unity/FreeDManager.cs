@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using CIFER.tech.FreeD.Core;
 using UnityEngine;
@@ -26,7 +27,15 @@ namespace CIFER.tech.FreeD.Unity
 
             foreach (var receiver in receivers)
             {
-                receiver.Open();
+                // ポートを開けない Receiver があっても、残りの Receiver は開く。
+                try
+                {
+                    receiver.Open();
+                }
+                catch (InvalidOperationException e)
+                {
+                    Debug.LogException(e, receiver);
+                }
             }
         }
 
