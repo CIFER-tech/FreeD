@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using FreeD;
 using UnityEngine;
@@ -28,7 +29,7 @@ public class FreeDReceiver : MonoBehaviour
 
     private UdpClient _udp;
     private Task _receiveTask;
-    private volatile bool _isRunning;
+    private CancellationTokenSource _cancellation;
 
     public FreeDFields Fields
     {
@@ -58,34 +59,54 @@ public class FreeDReceiver : MonoBehaviour
             _udp = null;
             return;
         }
-        _isRunning = true;
+        _cancellation = new CancellationTokenSource();
         UdpClient udp = _udp;
-        _receiveTask = Task.Run(() => ReceiveLoopAsync(udp, onPacket));
+        CancellationToken token = _cancellation.Token;
+        _receiveTask = Task.Run(() => ReceiveLoopAsync(udp, onPacket, token));
     }
 
     /// <summary>FreeDManager が呼ぶ。受信を止めてポートを閉じる。</summary>
     internal void Close()
     {
-        _isRunning = false;
-        // 受信待ちを終わらせるには、ソケットを閉じる (UdpClient.ReceiveAsync はキャンセルできない)
-        if (_udp != null) { try { _udp.Close(); } catch { } }
-        if (_receiveTask != null) { try { _receiveTask.Wait(500); } catch { } }
+        if (_cancellation == null) return;
+        _cancellation.Cancel();
+        try { _receiveTask.Wait(500); } catch { }
+        _udp.Close();
+        _cancellation.Dispose();
         _udp = null;
         _receiveTask = null;
+        _cancellation = null;
     }
 
-    async Task ReceiveLoopAsync(UdpClient udp, Action<FreeDReceiver, FreeDPacket> onPacket)
+    async Task ReceiveLoopAsync(UdpClient udp, Action<FreeDReceiver, FreeDPacket> onPacket, CancellationToken token)
     {
-        while (_isRunning)
+        while (!token.IsCancellationRequested)
         {
             UdpReceiveResult result;
             try
             {
-                result = await udp.ReceiveAsync();
+                result = await ReceiveAsync(udp, token);
             }
+            catch (OperationCanceledException) { return; }
             catch (ObjectDisposedException) { return; }
             catch (SocketException) { continue; }
             if (FreeDCodec.TryDecode(result.Buffer, out FreeDPacket p)) onPacket(this, p);
+        }
+    }
+
+    /// <summary>UdpClient.ReceiveAsync はキャンセルできないので、トークンが取り消されたら、ソケットを閉じて待ちを終わらせる。</summary>
+    static async Task<UdpReceiveResult> ReceiveAsync(UdpClient udp, CancellationToken token)
+    {
+        using (token.Register(() => udp.Close()))
+        {
+            try
+            {
+                return await udp.ReceiveAsync();
+            }
+            catch (Exception) when (token.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(token);
+            }
         }
     }
 }
