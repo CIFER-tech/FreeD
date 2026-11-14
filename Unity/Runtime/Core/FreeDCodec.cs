@@ -1,6 +1,6 @@
 using System;
 
-namespace FreeD
+namespace CIFER.tech.FreeD.Core
 {
     /// <summary>
     /// FreeD D1 メッセージ (29 バイト) の符号化・復号。
@@ -18,7 +18,6 @@ namespace FreeD
     /// [26..27] ユーザーデータ 16bit
     /// [28]     チェックサム = (0x40 - Σ[0..27]) mod 256
     /// </code>
-    /// 配置は Vizrt Tracking Hub の設定例と OSS 実装の2系統で一致を確認した。
     /// 公式の仕様書原本は未確認なので、受信機側の軸の向き・符号は実機で確認すること
     /// (受信機に合わせた符号の反転は、呼び出し側で行う)。
     /// </summary>
@@ -90,8 +89,8 @@ namespace FreeD
         /// <summary>先頭 28 バイトからチェックサムを求める: (0x40 − 総和) mod 256。</summary>
         public static byte Checksum(ReadOnlySpan<byte> bytesBeforeChecksum)
         {
-            int sum = 0;
-            for (int i = 0; i < bytesBeforeChecksum.Length; i++)
+            var sum = 0;
+            for (var i = 0; i < bytesBeforeChecksum.Length; i++)
             {
                 sum += bytesBeforeChecksum[i];
             }
@@ -100,7 +99,7 @@ namespace FreeD
 
         private static int ToRaw(double value, double scale)
         {
-            double raw = Math.Round(value * scale, MidpointRounding.AwayFromZero);
+            var raw = Math.Round(value * scale, MidpointRounding.AwayFromZero);
             if (double.IsNaN(raw))
             {
                 return 0;
@@ -136,7 +135,7 @@ namespace FreeD
 
         private static int ReadSigned24(ReadOnlySpan<byte> s, int offset)
         {
-            int v = (s[offset] << 16) | (s[offset + 1] << 8) | s[offset + 2];
+            var v = (s[offset] << 16) | (s[offset + 1] << 8) | s[offset + 2];
             return v >= 0x800000 ? v - 0x1000000 : v;
         }
 

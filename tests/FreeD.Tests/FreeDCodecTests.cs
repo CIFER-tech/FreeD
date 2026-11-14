@@ -1,3 +1,4 @@
+using CIFER.tech.FreeD.Core;
 using Xunit;
 
 namespace FreeD.Tests;
