@@ -45,7 +45,7 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 3 つのコンポーネントに分かれている。
 
 - `FreeDManager`: シーンに 1 つ置く。受信の開始・停止と、カメラ ID ごとの合成をすべて管理する。シーンになければ、受信も反映も行われない。再生を始めたときに無効な `FreeDReceiverForUnity` は、対象にならない (控えの Receiver は無効にして置く)。
-- `FreeDReceiverForUnity`: ポート 1 つで受信するだけ (受信そのものは Core の `FreeDReceiver` が行う)。送信元のポートごとに 1 つ置く。
+- `FreeDReceiverForUnity`: ポート 1 つで受信するだけ (受信そのものは `FreeDReceiver` が行う)。送信元のポートごとに 1 つ置く。
 - `FreeDTracker`: カメラ ID を指定して値を受け取り、自分のオブジェクトの位置・向きに反映する。親のオブジェクトが FreeD 座標の原点になる。
 
 1. パッケージを入れ、空のオブジェクトに `FreeDManager` を追加する。
@@ -81,8 +81,8 @@ Model と View は、Unity の `Awake`・`OnEnable`・`Update` などを使わ�
 
 ## ソースの置き場所について
 
-符号化・復号・合成のソースは `Runtime/Core/` にあり、Unity では Unity に依存しないアセンブリ `CIFER.tech.FreeD.Core` としてコンパイルされる (DLL は同梱しない)。コンポーネントは `Runtime/Unity/` にあり、アセンブリ `CIFER.tech.FreeD.Unity` が Core を参照する。
-リポジトリ直下の `FreeD.Core.props` は同じソースを取り込んで、DLL を作らずに、普通の .NET アプリとテストから使えるようにしている (手順は [README](../README.md))。
+符号化・復号・合成のソースは [`src/FreeD`](../src/FreeD) にあり、ビルドした `Runtime/CIFER.tech.FreeD.Core.dll` を同梱している。`main` に `src/FreeD` の変更が入ると、GitHub Actions が DLL を作り直して、この場所へコミットする。
+受信とコンポーネントのソースは `Runtime/` にあり、アセンブリ `CIFER.tech.FreeD.Unity` が DLL を参照する。
 
 ```
 dotnet test
