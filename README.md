@@ -1,10 +1,10 @@
 # FreeD
 
 FreeD (D1, 29 バイト) メッセージの符号化・復号ライブラリ (C#, netstandard2.1)。
-普通の .NET アプリからも、Unity (2021.2+) のパッケージ (`Unity/`) からも、同じ DLL (`CIFER.tech.FreeD.Core.dll`) で使える。Unity のパッケージには、ビルドした DLL を同梱する。
+普通の .NET アプリからも、Unity (2021.2+) のパッケージ (`src/FreeD.Unity/`) からも、同じ DLL (`CIFER.tech.FreeD.Core.dll`) で使える。Unity のパッケージには、ビルドした DLL を同梱する。
 
-Unity からは Package Manager 経由でも導入できる ([`Unity/`](Unity) 参照、UPM パッケージ `tech.cifer.freed`)。
-Unity のパッケージは、受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) を使う (`Packages/manifest.json` に足す。手順は [`Unity/README.md`](Unity/README.md))。
+Unity からは Package Manager 経由でも導入できる ([`src/FreeD.Unity/`](src/FreeD.Unity) 参照、UPM パッケージ `tech.cifer.freed`)。
+Unity のパッケージは、受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) を使う (`Packages/manifest.json` に足す。手順は [`src/FreeD.Unity/README.md`](src/FreeD.Unity/README.md))。
 
 ## 使い方
 
@@ -58,7 +58,7 @@ FreeDPacket merged = FreeDMerger.Merge(
 
 - 項目が重なったときは、2 つ目のパケットの値を使う。
 - 状態は持たない。最後に届いた値を保つこと、遅延、途切れの扱いは呼び出し側で行う。
-- Unity では `FreeDManager`・`FreeDReceiverForUnity`・`FreeDTracker` が使っている ([`Unity/`](Unity) 参照)。
+- Unity では `FreeDManager`・`FreeDReceiverForUnity`・`FreeDTracker` が使っている ([`src/FreeD.Unity/`](src/FreeD.Unity) 参照)。
 
 ## Unity で原点を合わせる
 

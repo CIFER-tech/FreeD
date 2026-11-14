@@ -32,13 +32,13 @@ jobs:
 
       - name: Copy build output into Unity package
         run: |
-          cp src/FreeD/bin/Release/netstandard2.1/CIFER.tech.FreeD.Core.dll Unity/Runtime/CIFER.tech.FreeD.Core.dll
+          cp src/FreeD/bin/Release/netstandard2.1/CIFER.tech.FreeD.Core.dll src/FreeD.Unity/Runtime/CIFER.tech.FreeD.Core.dll
 
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Unity/Runtime/CIFER.tech.FreeD.Core.dll
+          git add src/FreeD.Unity/Runtime/CIFER.tech.FreeD.Core.dll
           if git diff --cached --quiet; then
             echo "CIFER.tech.FreeD.Core.dll is already up to date."
           else

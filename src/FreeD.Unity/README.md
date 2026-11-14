@@ -7,7 +7,7 @@ FreeD (D1, 29 バイト) メッセージの符号化・復号と、Unity での�
 Package Manager → `+` → `Add package from git URL...` で以下を指定する。
 
 ```
-https://github.com/<owner>/FreeD.git?path=Unity
+https://github.com/<owner>/FreeD.git?path=src/FreeD.Unity
 ```
 
 特定バージョンに固定する場合は `#v1.0.0` のようにタグを付ける。
@@ -30,14 +30,14 @@ FreeDCodec.Encode(packet, buffer);
 if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 ```
 
-詳しいメッセージ配置・仕様の注意点はリポジトリ直下の [README](../README.md) を参照。
+詳しいメッセージ配置・仕様の注意点はリポジトリ直下の [README](../../README.md) を参照。
 
 ## 必要なパッケージ
 
 受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) (4.0.0 以降。ビルドした DLL を同梱している) を使う。`Packages/manifest.json` の `dependencies` に足しておく (FreeD と同じ置き方なら、次のとおり)。
 
 ```json
-"tech.cifer.ringbuffer": "file:../../../RingBuffer/Unity"
+"tech.cifer.ringbuffer": "file:../../../RingBuffer/src/RingBuffer.Unity"
 ```
 
 ## 受信コンポーネント (FreeDManager・FreeDReceiverForUnity・FreeDTracker)
@@ -81,7 +81,7 @@ Model と View は、Unity の `Awake`・`OnEnable`・`Update` などを使わ�
 
 ## ソースの置き場所について
 
-符号化・復号・合成と受信 (`FreeDReceiver`) のソースは [`src/FreeD`](../src/FreeD) にあり、ビルドした `Runtime/CIFER.tech.FreeD.Core.dll` を同梱している。`main` に `src/FreeD` の変更が入ると、GitHub Actions が DLL を作り直して、この場所へコミットする。
+符号化・復号・合成と受信 (`FreeDReceiver`) のソースは [`src/FreeD`](../FreeD) にあり、ビルドした `Runtime/CIFER.tech.FreeD.Core.dll` を同梱している。`main` に `src/FreeD` の変更が入ると、GitHub Actions が DLL を作り直して、この場所へコミットする。
 コンポーネントのソースは `Runtime/` にあり、アセンブリ `CIFER.tech.FreeD.Unity` が、FreeD と RingBuffer の 2 つの DLL を参照する。
 
 ```
