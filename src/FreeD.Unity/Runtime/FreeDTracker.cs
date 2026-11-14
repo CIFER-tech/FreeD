@@ -64,9 +64,9 @@ namespace CIFER.tech.FreeD.Unity
         }
 
         /// <summary>
-        /// receivedFields の項目だけを反映する。このカメラ ID で、まだ届いていない項目は値が 0 のままなので、反映しない。
+        /// field の項目だけを反映する。このカメラ ID で、まだ届いていない項目は値が 0 のままなので、反映しない。
         /// </summary>
-        public void Apply(in FreeDPacket packet, FreeDField receivedFields)
+        public void Apply(in FreeDPacket packet, FreeDField field)
         {
             // FreeD 座標 (X=右, Y=前, Z=上, m) での姿勢。
             // 回転は Rz(パン) · Rx(チルト) · Ry(ロール)。角度の正の向きは送信機器の仕様によるので、向きが逆なら rotationScale で反転する。
@@ -86,12 +86,12 @@ namespace CIFER.tech.FreeD.Unity
 
             // オフセットは Unity のカメラのローカル軸で適用する。
             // 向きが届いていないときは、今の向きから、向きのオフセットを除いたものを使う。
-            var isRotationReceived = (receivedFields & FreeDField.Rotation) != 0;
+            var isRotationReceived = (field & FreeDField.Rotation) != 0;
             var offsetRotation = isRotationReceived
                 ? unityRotation
                 : transform.localRotation * Quaternion.Inverse(Quaternion.Euler(rotationOffset));
 
-            if ((receivedFields & FreeDField.Position) != 0)
+            if ((field & FreeDField.Position) != 0)
             {
                 transform.localPosition = unityPosition + offsetRotation * positionOffset;
             }
@@ -106,13 +106,13 @@ namespace CIFER.tech.FreeD.Unity
                 return;
             }
 
-            if ((receivedFields & FreeDField.Zoom) != 0 && zoomToFocalLengthMm.length > 0)
+            if ((field & FreeDField.Zoom) != 0 && zoomToFocalLengthMm.length > 0)
             {
                 camera.usePhysicalProperties = true;
                 camera.focalLength = zoomToFocalLengthMm.Evaluate(packet.ZoomRaw);
             }
 #if UNITY_2022_2_OR_NEWER
-            if ((receivedFields & FreeDField.Focus) != 0 && focusToDistanceM.length > 0)
+            if ((field & FreeDField.Focus) != 0 && focusToDistanceM.length > 0)
             {
                 camera.focusDistance = focusToDistanceM.Evaluate(packet.FocusRaw);
             }

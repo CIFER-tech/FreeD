@@ -9,10 +9,7 @@ namespace CIFER.tech.FreeD.Unity
     public sealed class FreeDManager : MonoBehaviour
     {
         private readonly List<FreeDReceiverForUnity> receivers = new();
-
         private readonly List<FreeDTracker> trackers = new();
-
-        // カメラ ID ごとの、合成したパケットと、Receiver から届いたことのある項目。
         private readonly Dictionary<int, (FreeDPacket packet, FreeDField fields)> mergedByCameraId = new();
 
         private void OnEnable()
@@ -106,7 +103,7 @@ namespace CIFER.tech.FreeD.Unity
                     continue;
                 }
 
-                receiver.Close();
+                receiver?.Close();
                 receivers.RemoveAt(i);
             }
         }
