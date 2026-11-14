@@ -32,7 +32,7 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
         [Tooltip("ms。他のストリームより早く届くときに、この分だけ反映を遅らせてそろえる")]
         public float delayMs = 0f;
 
-        [Header("状態")]
+        // 状態の欄は FreeDStreamDrawer が枠で囲んで描く (Header は付けない)
         [FreeDReadOnly] public bool receiving;
         [FreeDReadOnly] public int packetsPerSecond;
         [Tooltip("直近1秒の受信間隔 (ms)"), FreeDReadOnly]

@@ -1,0 +1,63 @@
+using UnityEditor;
+using UnityEngine;
+
+/// <summary>FreeDReceiver.Stream を、設定の項目と、枠で囲んだ状態の欄に分けて描く。</summary>
+[CustomPropertyDrawer(typeof(FreeDReceiver.Stream))]
+public class FreeDStreamDrawer : PropertyDrawer
+{
+    static readonly string[] SettingNames = { "port", "cameraId", "fields", "delayMs" };
+    static readonly string[] StatusNames = { "receiving", "packetsPerSecond", "meanIntervalMs", "maxIntervalMs" };
+
+    const float BoxPadding = 4f;
+
+    static float LineHeight { get { return EditorGUIUtility.singleLineHeight; } }
+    static float Spacing { get { return EditorGUIUtility.standardVerticalSpacing; } }
+
+    static float FieldsHeight(SerializedProperty stream, string[] names)
+    {
+        float height = 0f;
+        foreach (string name in names)
+            height += EditorGUI.GetPropertyHeight(stream.FindPropertyRelative(name), true) + Spacing;
+        return height;
+    }
+
+    static float StatusBoxHeight(SerializedProperty stream)
+    {
+        return BoxPadding * 2 + LineHeight + Spacing + FieldsHeight(stream, StatusNames);
+    }
+
+    public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
+    {
+        if (!property.isExpanded) return LineHeight;
+        return LineHeight + Spacing + FieldsHeight(property, SettingNames) + Spacing + StatusBoxHeight(property);
+    }
+
+    public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+    {
+        var line = new Rect(position.x, position.y, position.width, LineHeight);
+        property.isExpanded = EditorGUI.Foldout(line, property.isExpanded, label, true);
+        if (!property.isExpanded) return;
+
+        float y = line.yMax + Spacing;
+        EditorGUI.indentLevel++;
+        foreach (string name in SettingNames)
+            y = DrawField(position, y, property.FindPropertyRelative(name));
+
+        y += Spacing;
+        var box = new Rect(position.x, y, position.width, StatusBoxHeight(property) );
+        GUI.Box(EditorGUI.IndentedRect(box), GUIContent.none, EditorStyles.helpBox);
+        y += BoxPadding;
+        EditorGUI.LabelField(new Rect(position.x, y, position.width, LineHeight), "状態", EditorStyles.boldLabel);
+        y += LineHeight + Spacing;
+        foreach (string name in StatusNames)
+            y = DrawField(position, y, property.FindPropertyRelative(name));
+        EditorGUI.indentLevel--;
+    }
+
+    static float DrawField(Rect position, float y, SerializedProperty field)
+    {
+        float height = EditorGUI.GetPropertyHeight(field, true);
+        EditorGUI.PropertyField(new Rect(position.x, y, position.width, height), field, true);
+        return y + height + Spacing;
+    }
+}
