@@ -5,9 +5,9 @@ using UnityEngine;
 /// カメラの焦点距離 (mm) とピント距離 (m) に直して反映する。
 /// 対応はレンズごとに違うので、実測した点を AnimationCurve に入れる (横軸 = 生の値)。
 /// キーのない曲線と、まだ値が届いていない項目は反映しない。
+/// カメラに付ける。親にある FreeDReceiver から値を受け取る。
 /// </summary>
 [RequireComponent(typeof(Camera))]
-[RequireComponent(typeof(FreeDReceiver))]
 [DisallowMultipleComponent]
 public class FreeDLens : MonoBehaviour
 {
@@ -27,11 +27,12 @@ public class FreeDLens : MonoBehaviour
     void Awake()
     {
         _camera = GetComponent<Camera>();
-        _receiver = GetComponent<FreeDReceiver>();
+        _receiver = GetComponentInParent<FreeDReceiver>();
     }
 
     void LateUpdate()
     {
+        if (_receiver == null) return;
         if (_receiver.hasZoom && zoomToFocalLengthMm.length > 0)
         {
             focalLengthMm = zoomToFocalLengthMm.Evaluate(_receiver.zoomRaw);

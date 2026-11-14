@@ -8,7 +8,10 @@ using UnityEngine;
 using UnityEngine.Serialization;
 
 /// <summary>
-/// FreeD (UDP) を受信して、このオブジェクト (カメラ) の位置と向きに反映する。
+/// FreeD (UDP) を受信して、カメラ (cameraTransform) の位置と向きに反映する。
+/// このオブジェクトが retroloc の原点になる。カメラはこのオブジェクトの子にする。
+/// このオブジェクトの Position と Rotation の Y が、retroloc の原点の位置と水平の向きになる。
+/// Scene ビューの青い矢印 (前) が retroloc の Y 方向、赤い矢印 (右) が X 方向。床は水平とみなすので、傾き (X・Z の回転) は 0 に保つ。
 /// ストリーム (ポート) を複数並べて、回転・位置・ズーム・フォーカスのどれをどのストリームから使うかを選べる
 /// (例: 姿勢は retroloc のポート 40000、ズームとフォーカスはレンズエンコーダのポート 40001)。
 /// retroloc のワールド (X=右, Y=前, Z=上, m) を Unity に変換する。
@@ -78,6 +81,9 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
         }
     }
 
+    [Tooltip("位置と向きを反映するカメラ。このオブジェクトの子にする")]
+    public Transform cameraTransform;
+
     [Header("受信")]
     public List<Stream> streams = new List<Stream> { new Stream() };
 
@@ -146,7 +152,22 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
         _legacyPositionOffset = _legacyRotationOffset = Vector3.zero;
     }
 
-    void OnValidate() { ResolveOverlaps(); }
+    void OnValidate() { ResolveOverlaps(); KeepFloorLevel(); }
+    void LateUpdate() { KeepFloorLevel(); }
+
+    void KeepFloorLevel()
+    {
+        Vector3 angles = transform.eulerAngles;
+        if (angles.x != 0 || angles.z != 0) transform.rotation = Quaternion.Euler(0, angles.y, 0);
+    }
+
+    void OnDrawGizmos()
+    {
+        Transform t = transform;
+        Gizmos.color = Color.red; Gizmos.DrawLine(t.position, t.position + t.right * 0.5f);
+        Gizmos.color = Color.green; Gizmos.DrawLine(t.position, t.position + t.up * 0.5f);
+        Gizmos.color = Color.blue; Gizmos.DrawLine(t.position, t.position + t.forward * 0.5f);
+    }
 
     /// <summary>
     /// 同じ項目を 2 つのストリームが使わないようにする。
@@ -316,8 +337,9 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
         // Unity 座標へ変換してから、Unity のカメラのローカル軸でオフセットを適用する
         Vector3 uPos = new Vector3(pos.x, pos.z, pos.y);
         Quaternion uRot = new Quaternion(-q.x, -q.z, -q.y, q.w);
-        if (hasPosition) transform.localPosition = uPos + uRot * StreamUsing(FreeDFields.Position).positionOffset;
-        if (hasRotation) transform.localRotation = uRot * Quaternion.Euler(StreamUsing(FreeDFields.Rotation).rotationOffset);
+        if (cameraTransform == null) return;
+        if (hasPosition) cameraTransform.localPosition = uPos + uRot * StreamUsing(FreeDFields.Position).positionOffset;
+        if (hasRotation) cameraTransform.localRotation = uRot * Quaternion.Euler(StreamUsing(FreeDFields.Rotation).rotationOffset);
     }
 
     /// <summary>項目を担当するストリーム。担当は 1 本だけ (重なりは ResolveOverlaps が防ぐ)。</summary>

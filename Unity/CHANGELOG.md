@@ -6,7 +6,7 @@
 - 状態の欄を、編集できない表示だけの欄にした (Editor 用のアセンブリ `FreeD.Unity.Editor` を追加)。`FreeDReceiver`・各ストリーム・`FreeDLens` の状態の欄は、枠で囲んでまとめた (見出しは付けない)。
 - `panSign` / `tiltSign` / `rollSign` を、ストリームごとの `rotationScale` (Vector3。X=パン, Y=チルト, Z=ロール) に変更。符号ではなく倍率としてかけているので名前も改めた。1.3.0 までのシーンの値は、回転を使うストリームへ自動で移る。
 - `positionOffset` / `rotationOffset` を、ストリームごとの設定に移した。位置を使うストリームの `positionOffset` と、回転を使うストリームの `rotationOffset` が効く。1.3.0 までのシーンの値は、それらのストリームへ自動で移る。
-- `FreeDOrigin` の `originMarker` を廃止。原点は `FreeDOrigin` 自身の Position と Rotation の Y で決める。
+- `FreeDOrigin` を廃止し、`FreeDReceiver` を付けたオブジェクトが原点になるようにした。カメラはその子にして、`FreeDReceiver` の `cameraTransform` に入れる。`FreeDLens` は、カメラに付け、親の `FreeDReceiver` から値を受け取る。1.3.0 までのシーンは、手で組み直す必要がある (`FreeDReceiver` を原点のオブジェクトへ移し、`cameraTransform` にカメラを入れる)。
 - `FreeDReceiver` の `pan`/`tilt`/`roll` と `xMm`/`yMm`/`zMm` を、`panTiltRollDeg` と `positionMm` (どちらも Vector3) にまとめた。`zoomRaw` を `hasZoom` の下、`focusRaw` を `hasFocus` の下に並べた。
 
 ## [1.3.0] - 2026-10-30

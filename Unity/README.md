@@ -35,12 +35,13 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 
 ## 受信コンポーネント (FreeDReceiver)
 
-Unity のカメラ (または任意のオブジェクト) に `FreeDReceiver` を付けるだけで、UDP で受信したFreeDが位置・向きに反映される。
+空のオブジェクトに `FreeDReceiver` を付け、カメラをその子にすると、UDP で受信した FreeD がカメラの位置・向きに反映される。`FreeDReceiver` を付けたオブジェクトが retroloc の原点になる。
 
-1. パッケージを入れ、カメラに `FreeDReceiver` を追加する。
-2. `Streams` の 1 本目の `Port` を retroloc の「FreeD送信」のポート (既定 40000) に合わせる。
-3. 再生すると、左上に受信状態・位置 (mm)・角度 (°) が出る。
-4. 向きが逆なら、そのストリームの `Rotation Scale` の該当する軸 (X=パン, Y=チルト, Z=ロール) を -1 にする。カメラ取り付けのずれは、そのストリームの `Position Offset` / `Rotation Offset` で合わせる (どちらも Unity の座標・向きで指定。カメラのローカル軸: 右・上・前、回転は Transform の Rotation と同じ)。
+1. パッケージを入れ、空のオブジェクトに `FreeDReceiver` を追加する。カメラをその子にして、`Camera Transform` に入れる。
+2. `FreeDReceiver` のオブジェクトの Position と Rotation の Y を、retroloc の原点にあたる Unity 上の場所と向きに合わせる (Scene ビューの青い矢印 = retroloc の Y、赤い矢印 = X)。床は水平とみなすので、傾き (X・Z の回転) は 0 に保たれる。
+3. `Streams` の 1 本目の `Port` を retroloc の「FreeD送信」のポート (既定 40000) に合わせる。
+4. 再生すると、左上に受信状態・位置 (mm)・角度 (°) が出る。
+5. 向きが逆なら、そのストリームの `Rotation Scale` の該当する軸 (X=パン, Y=チルト, Z=ロール) を -1 にする。カメラ取り付けのずれは、そのストリームの `Position Offset` / `Rotation Offset` で合わせる (どちらも Unity の座標・向きで指定。カメラのローカル軸: 右・上・前、回転は Transform の Rotation と同じ)。
 
 座標は retroloc のワールド (X=右, Y=前, Z=上, m) から Unity へ `(x, y, z) → (x, z, y)` で変換する。
 
@@ -52,7 +53,7 @@ Unity のカメラ (または任意のオブジェクト) に `FreeDReceiver` �
 2. 同じ項目は 1 つのストリームだけが使える。選ぶと、他のストリームの選択が外れる。
 3. 項目ごとに、そのストリームで最後に届いた値を使う。途切れても値は保たれ、左上の表示でそのストリームが「途切れ」になる。
 4. 映像とのずれは、早く届く側のストリームの `Delay Ms` で合わせる (その分だけ反映を遅らせる)。
-5. ズームとフォーカスの生の値 (24bit) は `zoomRaw` / `focusRaw` に出る。カメラに反映するには、同じオブジェクトに `FreeDLens` を付け、AnimationCurve に対応を入れる (横軸 = 生の値、縦軸 = 焦点距離 mm / ピント距離 m)。焦点距離は Physical Camera に入る。ピント距離は Unity 2022.2 以降で `Camera.focusDistance` にも入り、`FreeDLens.focusDistanceM` からも読める。
+5. ズームとフォーカスの生の値 (24bit) は `zoomRaw` / `focusRaw` に出る。カメラに反映するには、カメラに `FreeDLens` を付け、AnimationCurve に対応を入れる (横軸 = 生の値、縦軸 = 焦点距離 mm / ピント距離 m)。焦点距離は Physical Camera に入る。ピント距離は Unity 2022.2 以降で `Camera.focusDistance` にも入り、`FreeDLens.focusDistanceM` からも読める。
 
 1.2 までのシーンの `port` / `cameraId` は、読み込むと `Streams` の 1 本目に移る。
 
