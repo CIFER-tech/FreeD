@@ -1,6 +1,10 @@
 {
   "name": "tech.cifer.freed",
   "version": "2.0.0",
+  "license": "MIT",
+  "documentationUrl": "https://github.com/CIFER-tech/FreeD#readme",
+  "changelogUrl": "https://github.com/CIFER-tech/FreeD/releases",
+  "licensesUrl": "https://github.com/CIFER-tech/FreeD/blob/main/LICENSE",
   "displayName": "FreeD",
   "description": "FreeD (D1, 29 バイト) メッセージの符号化・復号ライブラリ。カメラトラッキングデータ (パン/チルト/ロール/位置/ズーム/フォーカス) をUDP等で送受信する際のパケットを扱う。",
   "unity": "2021.2",
