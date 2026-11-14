@@ -37,7 +37,9 @@ namespace FreeD
         public static int Encode(in FreeDPacket p, Span<byte> destination)
         {
             if (destination.Length < PacketLength)
-                throw new ArgumentException($"destination must be at least {PacketLength} bytes.", nameof(destination));
+            {
+                    throw new ArgumentException($"destination must be at least {PacketLength} bytes.", nameof(destination));
+            }
 
             destination[0] = MessageTypeD1;
             destination[1] = p.CameraId;
@@ -59,9 +61,18 @@ namespace FreeD
         public static bool TryDecode(ReadOnlySpan<byte> source, out FreeDPacket packet)
         {
             packet = default;
-            if (source.Length < PacketLength) return false;
-            if (source[0] != MessageTypeD1) return false;
-            if (source[PacketLength - 1] != Checksum(source.Slice(0, PacketLength - 1))) return false;
+            if (source.Length < PacketLength)
+            {
+                return false;
+            }
+            if (source[0] != MessageTypeD1)
+            {
+                return false;
+            }
+            if (source[PacketLength - 1] != Checksum(source.Slice(0, PacketLength - 1)))
+            {
+                return false;
+            }
 
             packet.CameraId = source[1];
             packet.PanDegrees = ReadSigned24(source, 2) / AngleScale;
@@ -80,16 +91,28 @@ namespace FreeD
         public static byte Checksum(ReadOnlySpan<byte> bytesBeforeChecksum)
         {
             int sum = 0;
-            for (int i = 0; i < bytesBeforeChecksum.Length; i++) sum += bytesBeforeChecksum[i];
+            for (int i = 0; i < bytesBeforeChecksum.Length; i++)
+            {
+                sum += bytesBeforeChecksum[i];
+            }
             return (byte)((0x40 - sum) & 0xFF);
         }
 
         private static int ToRaw(double value, double scale)
         {
             double raw = Math.Round(value * scale, MidpointRounding.AwayFromZero);
-            if (double.IsNaN(raw)) return 0;
-            if (raw < Signed24Min) return Signed24Min;
-            if (raw > Signed24Max) return Signed24Max;
+            if (double.IsNaN(raw))
+            {
+                return 0;
+            }
+            if (raw < Signed24Min)
+            {
+                return Signed24Min;
+            }
+            if (raw > Signed24Max)
+            {
+                return Signed24Max;
+            }
             return (int)raw;
         }
 
@@ -102,7 +125,10 @@ namespace FreeD
 
         private static void WriteUnsigned24(Span<byte> d, int offset, uint value)
         {
-            if (value > Unsigned24Max) value = Unsigned24Max;
+            if (value > Unsigned24Max)
+            {
+                value = Unsigned24Max;
+            }
             d[offset] = (byte)((value >> 16) & 0xFF);
             d[offset + 1] = (byte)((value >> 8) & 0xFF);
             d[offset + 2] = (byte)(value & 0xFF);

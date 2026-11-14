@@ -37,7 +37,9 @@ namespace FreeD
             {
                 var fields = fieldsPerStream[i];
                 if ((claimed & fields) != FreeDFields.None)
-                    throw new ArgumentException("同じ項目を複数のストリームが担当している: " + (claimed & fields), nameof(fieldsPerStream));
+                {
+                        throw new ArgumentException("同じ項目を複数のストリームが担当している: " + (claimed & fields), nameof(fieldsPerStream));
+                }
                 claimed |= fields;
                 _fieldsPerStream[i] = fields;
             }
@@ -72,7 +74,9 @@ namespace FreeD
             {
                 var pending = _pendingPerStream[i];
                 while (pending.Count > 0 && pending.Peek().ReceivedMs + _delayMsPerStream[i] <= nowMs)
-                    Apply(i, pending.Dequeue().Packet);
+                {
+                        Apply(i, pending.Dequeue().Packet);
+                }
             }
             merged = _merged;
             return _filled;
@@ -100,8 +104,14 @@ namespace FreeD
                 _merged.YMeters = packet.YMeters;
                 _merged.ZMeters = packet.ZMeters;
             }
-            if ((fields & FreeDFields.Zoom) != 0) _merged.ZoomRaw = packet.ZoomRaw;
-            if ((fields & FreeDFields.Focus) != 0) _merged.FocusRaw = packet.FocusRaw;
+            if ((fields & FreeDFields.Zoom) != 0)
+            {
+                _merged.ZoomRaw = packet.ZoomRaw;
+            }
+            if ((fields & FreeDFields.Focus) != 0)
+            {
+                _merged.FocusRaw = packet.FocusRaw;
+            }
             _filled |= fields;
         }
     }
