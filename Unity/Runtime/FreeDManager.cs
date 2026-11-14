@@ -12,79 +12,21 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class FreeDManager : MonoBehaviour
 {
-    /// <summary>この時間 (ms) パケットが来ない Receiver を、途切れとみなす。</summary>
-    private const double TimeoutMs = 500;
-
-    private struct Merged
-    {
-        public FreeDFields filled;
-        public FreeDPacket packet;
-        public bool isReceiving;
-    }
-
-    /// <summary>Receiver (ポート) ごとの受信状態 (Inspector で見る用)。</summary>
-    [System.Serializable]
-    public class ReceiverStatus
-    {
-        public int port;
-        public bool isReceiving;
-        public int packetsPerSecond;
-        [Tooltip("直近1秒の受信間隔 (ms)")]
-        public float meanIntervalMs, maxIntervalMs;
-
-        // 受信タスクが書き、Update が読む。FreeDManager の _lock で守る。
-        [System.NonSerialized] private int _count;
-        [System.NonSerialized] private double _sumIntervalMs, _maxIntervalMsSoFar, _lastReceivedMs = double.NegativeInfinity;
-
-        internal void RecordPacket(double nowMs)
-        {
-            _count++;
-            if (_lastReceivedMs > double.NegativeInfinity)
-            {
-                double intervalMs = nowMs - _lastReceivedMs;
-                _sumIntervalMs += intervalMs;
-                if (intervalMs > _maxIntervalMsSoFar) _maxIntervalMsSoFar = intervalMs;
-            }
-            _lastReceivedMs = nowMs;
-        }
-
-        internal void UpdateIsReceiving(double nowMs) { isReceiving = nowMs - _lastReceivedMs < TimeoutMs; }
-
-        /// <summary>1 秒ぶんの受信間隔を出して、集計をやり直す。</summary>
-        internal void PublishRates(float elapsedSeconds)
-        {
-            packetsPerSecond = Mathf.RoundToInt(_count / elapsedSeconds);
-            meanIntervalMs = _count > 1 ? (float)(_sumIntervalMs / (_count - 1)) : 0f;
-            maxIntervalMs = (float)_maxIntervalMsSoFar;
-            _count = 0; _sumIntervalMs = 0; _maxIntervalMsSoFar = 0;
-        }
-    }
-
-    /// <summary>届いたカメラ ID ごとの状態 (Inspector で見る用)。</summary>
-    [System.Serializable]
-    public class CameraStatus
-    {
-        public int cameraId;
-        public bool isReceiving;
-        public string fields;
-        [System.NonSerialized] internal FreeDFields lastFilled = (FreeDFields)(-1);
-    }
-
     public static FreeDManager Instance { get; private set; }
 
     // 状態の欄は FreeDManagerEditor が枠で囲んで描く (Header は付けない)
     [FreeDReadOnly] public bool receiving;
     [Tooltip("全 Receiver が直近 1 秒に受けたパケットの合計"), FreeDReadOnly]
     public int totalPacketsPerSecond;
-    public List<ReceiverStatus> receivers = new List<ReceiverStatus>();
-    public List<CameraStatus> cameras = new List<CameraStatus>();
+    public List<FreeDReceiverStatus> receivers = new List<FreeDReceiverStatus>();
+    public List<FreeDCameraStatus> cameras = new List<FreeDCameraStatus>();
 
     private readonly object _lock = new object();
     private readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
     // 受信を開いた Receiver。FreeDMerger の streamIndex と receivers の添字は、この並びと同じ。
     private readonly List<FreeDReceiver> _openedReceivers = new List<FreeDReceiver>();
     private readonly Dictionary<int, FreeDMerger> _mergersByCameraId = new Dictionary<int, FreeDMerger>();
-    private readonly Dictionary<int, Merged> _mergedByCameraId = new Dictionary<int, Merged>();
+    private readonly Dictionary<int, FreeDMergedCamera> _mergedByCameraId = new Dictionary<int, FreeDMergedCamera>();
     // シーンから見つけた有効な Receiver。項目の重なりなどで開けなかったものも含む。
     private readonly List<FreeDReceiver> _foundReceivers = new List<FreeDReceiver>();
     private bool _isReceiverSetChanged;
@@ -126,7 +68,7 @@ public class FreeDManager : MonoBehaviour
     /// <param name="filled">1 度でも値が入った項目。含まれない項目は packet の中身を使ってはいけない。</param>
     public bool TryGet(int cameraId, out FreeDFields filled, out FreeDPacket packet, out bool isReceiving)
     {
-        if (_mergedByCameraId.TryGetValue(cameraId, out Merged merged))
+        if (_mergedByCameraId.TryGetValue(cameraId, out FreeDMergedCamera merged))
         {
             filled = merged.filled; packet = merged.packet; isReceiving = merged.isReceiving;
             return true;
@@ -148,7 +90,7 @@ public class FreeDManager : MonoBehaviour
         _openedReceivers.AddRange(_foundReceivers);
         foreach (FreeDReceiver r in _openedReceivers)
         {
-            receivers.Add(new ReceiverStatus { port = r.port });
+            receivers.Add(new FreeDReceiverStatus { port = r.port });
             r.Open(OnPacket);
         }
     }
@@ -244,7 +186,7 @@ public class FreeDManager : MonoBehaviour
                 isReceiving |= merger.IsReceiving(i, nowMs);
             }
             FreeDFields filled = merger.Update(nowMs, out FreeDPacket packet);
-            _mergedByCameraId[pair.Key] = new Merged { filled = filled, packet = packet, isReceiving = isReceiving };
+            _mergedByCameraId[pair.Key] = new FreeDMergedCamera { filled = filled, packet = packet, isReceiving = isReceiving };
         }
     }
 
@@ -252,7 +194,7 @@ public class FreeDManager : MonoBehaviour
     void PublishReceiverStatus(double nowMs)
     {
         receiving = false;
-        foreach (ReceiverStatus status in receivers)
+        foreach (FreeDReceiverStatus status in receivers)
         {
             status.UpdateIsReceiving(nowMs);
             receiving |= status.isReceiving;
@@ -261,7 +203,7 @@ public class FreeDManager : MonoBehaviour
         _rateTimerSeconds += Time.unscaledDeltaTime;
         if (_rateTimerSeconds < 1f) return;
         totalPacketsPerSecond = 0;
-        foreach (ReceiverStatus status in receivers)
+        foreach (FreeDReceiverStatus status in receivers)
         {
             status.PublishRates(_rateTimerSeconds);
             totalPacketsPerSecond += status.packetsPerSecond;
@@ -272,9 +214,9 @@ public class FreeDManager : MonoBehaviour
     /// <summary>_lock の中で呼ぶ。</summary>
     void PublishCameraStatus()
     {
-        foreach (KeyValuePair<int, Merged> pair in _mergedByCameraId)
+        foreach (KeyValuePair<int, FreeDMergedCamera> pair in _mergedByCameraId)
         {
-            CameraStatus status = FindOrAddCameraStatus(pair.Key);
+            FreeDCameraStatus status = FindOrAddCameraStatus(pair.Key);
             status.isReceiving = pair.Value.isReceiving;
             if (status.lastFilled == pair.Value.filled) continue;
             status.lastFilled = pair.Value.filled;
@@ -283,7 +225,7 @@ public class FreeDManager : MonoBehaviour
     }
 
     /// <summary>cameras はカメラ ID の昇順に保つ。</summary>
-    CameraStatus FindOrAddCameraStatus(int cameraId)
+    FreeDCameraStatus FindOrAddCameraStatus(int cameraId)
     {
         int insertIndex = 0;
         for (; insertIndex < cameras.Count; insertIndex++)
@@ -291,7 +233,7 @@ public class FreeDManager : MonoBehaviour
             if (cameras[insertIndex].cameraId == cameraId) return cameras[insertIndex];
             if (cameras[insertIndex].cameraId > cameraId) break;
         }
-        var status = new CameraStatus { cameraId = cameraId };
+        var status = new FreeDCameraStatus { cameraId = cameraId };
         cameras.Insert(insertIndex, status);
         return status;
     }
