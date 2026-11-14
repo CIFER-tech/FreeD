@@ -3,54 +3,78 @@ using FreeD;
 using UnityEngine;
 
 /// <summary>
-/// FreeD 受信を管理する。シーンに 1 つ置く。
-/// 有効な FreeDReceiver の受信を開始・停止し、毎フレーム各 Receiver のパケットを取りに行って、カメラ ID ごとに FreeDMerger で合成して、
-/// FreeDTracker に反映する。
-/// MVP の Presenter。Model (FreeDReceiver) と View (FreeDTracker) は、互いを知らず、寿命と毎フレームの処理をすべてここで行う
-/// (Receiver と Tracker は Unity の Update などを使わない)。
+/// MVP の Presenter。シーンに 1 つ置く。FreeDReceiver (Model) と FreeDTracker (View) の寿命と毎フレームの処理をすべて持つ。
+/// 毎フレーム、各 Receiver のパケットを取り出し、カメラ ID ごとに FreeDMerger で合成して、その ID の Tracker に反映する。
 /// FreeDManager がなければ、受信も反映も行われない。
+/// Receiver と Tracker は受信を始めるときにシーンから探す。再生中に新しく置いたものは、再生を始め直すまで対象にならない。
 /// </summary>
 [DefaultExecutionOrder(-100)]
 [DisallowMultipleComponent]
 public class FreeDManager : MonoBehaviour
 {
-    // 受信を開いた Receiver。FreeDMerger の streamIndex は、この並びの添字。
+    // 無効なものも含む。あとで有効になったら、受信を開き直す。
+    private readonly List<FreeDReceiver> _sceneReceivers = new List<FreeDReceiver>();
+    private readonly List<FreeDTracker> _sceneTrackers = new List<FreeDTracker>();
+
+    // 受信を開いた Receiver と、開いたときの使う項目。添字が FreeDMerger のストリームの番号になる。
     private readonly List<FreeDReceiver> _openedReceivers = new List<FreeDReceiver>();
+    private readonly List<FreeDFields> _fieldsPerStream = new List<FreeDFields>();
+
     private readonly Dictionary<int, FreeDMerger> _mergersByCameraId = new Dictionary<int, FreeDMerger>();
-    // カメラ ID ごとの、合成済みのパケット。値が 1 つも入っていない ID は入れない。
+    // 値が 1 つも入っていない ID は入れない (Tracker に渡さない)。
     private readonly Dictionary<int, FreeDPacket> _mergedPacketsByCameraId = new Dictionary<int, FreeDPacket>();
-    // シーンから見つけた Receiver (無効なものも含む)。有効・無効の切り替えを、Signature で見つける。
-    private readonly List<FreeDReceiver> _foundReceivers = new List<FreeDReceiver>();
-    private readonly List<FreeDTracker> _foundTrackers = new List<FreeDTracker>();
-    private int _openedSignature;
+
+    private int _openedSettingsHash;
 
     private void OnEnable()
     {
-        StartReceiving();
+        OpenReceivers();
     }
 
     private void OnDisable()
     {
-        StopReceiving();
-    }
-
-    private void OnDestroy()
-    {
-        StopReceiving();
+        CloseReceivers();
     }
 
     private void Update()
     {
-        if (Signature() != _openedSignature)
+        if (ReceiverSettingsHash() != _openedSettingsHash)
         {
-            StopReceiving();
-            StartReceiving();
+            CloseReceivers();
+            OpenReceivers();
         }
 
-        PollReceivers();
-        MergeAll(FreeDClock.NowMs);
+        for (int streamIndex = 0; streamIndex < _openedReceivers.Count; streamIndex++)
+        {
+            while (_openedReceivers[streamIndex].TryDequeue(out FreeDReceivedPacket received))
+            {
+                int cameraId = received.packet.CameraId;
+                if (!_mergersByCameraId.TryGetValue(cameraId, out FreeDMerger merger))
+                {
+                    merger = new FreeDMerger(_fieldsPerStream);
+                    _mergersByCameraId.Add(cameraId, merger);
+                }
+                merger.Put(streamIndex, received.packet, received.receivedMs);
+            }
+        }
 
-        foreach (FreeDTracker tracker in _foundTrackers)
+        double nowMs = FreeDClock.NowMs;
+        foreach (KeyValuePair<int, FreeDMerger> cameraIdAndMerger in _mergersByCameraId)
+        {
+            FreeDMerger merger = cameraIdAndMerger.Value;
+            // delayMs は再生中に Inspector で変えられるので、毎フレーム渡す。
+            for (int streamIndex = 0; streamIndex < _openedReceivers.Count; streamIndex++)
+            {
+                merger.SetDelay(streamIndex, _openedReceivers[streamIndex].delayMs);
+            }
+            FreeDFields filledFields = merger.Update(nowMs, out FreeDPacket merged);
+            if (filledFields != FreeDFields.None)
+            {
+                _mergedPacketsByCameraId[cameraIdAndMerger.Key] = merged;
+            }
+        }
+
+        foreach (FreeDTracker tracker in _sceneTrackers)
         {
             if (tracker == null || !tracker.isActiveAndEnabled)
             {
@@ -63,125 +87,73 @@ public class FreeDManager : MonoBehaviour
         }
     }
 
-    private void StartReceiving()
+    private void OpenReceivers()
     {
-        FindReceiversAndTrackers();
-        _openedSignature = Signature();
-        if (HasOverlappedFields())
-        {
-            return;
-        }
+        _sceneReceivers.Clear();
+        _sceneTrackers.Clear();
+#if UNITY_2022_2_OR_NEWER
+        _sceneReceivers.AddRange(FindObjectsByType<FreeDReceiver>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
+        _sceneTrackers.AddRange(FindObjectsByType<FreeDTracker>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
+#else
+        _sceneReceivers.AddRange(FindObjectsOfType<FreeDReceiver>(true));
+        _sceneTrackers.AddRange(FindObjectsOfType<FreeDTracker>(true));
+#endif
+        // 項目が重なって受信を始めないときも記録する。設定が直るまで、開き直さない。
+        _openedSettingsHash = ReceiverSettingsHash();
 
-        foreach (FreeDReceiver receiver in _foundReceivers)
+        // FreeDMerger は同じ項目を 2 つのストリームが担当すると合成できないので、重なっていたら 1 つも開かない。
+        var claimedFields = FreeDFields.None;
+        foreach (FreeDReceiver receiver in _sceneReceivers)
         {
             if (!receiver.isActiveAndEnabled)
             {
                 continue;
             }
+            FreeDFields overlappedFields = claimedFields & receiver.UsedFields;
+            if (overlappedFields != FreeDFields.None)
+            {
+                Debug.LogError("FreeD: 同じ項目を複数の Receiver が担当している: " + overlappedFields, this);
+                _openedReceivers.Clear();
+                _fieldsPerStream.Clear();
+                return;
+            }
+            claimedFields |= receiver.UsedFields;
             _openedReceivers.Add(receiver);
+            _fieldsPerStream.Add(receiver.UsedFields);
+        }
+
+        foreach (FreeDReceiver receiver in _openedReceivers)
+        {
             receiver.Open();
         }
     }
 
-    private void StopReceiving()
+    private void CloseReceivers()
     {
         foreach (FreeDReceiver receiver in _openedReceivers)
         {
             receiver.Close();
         }
         _openedReceivers.Clear();
+        _fieldsPerStream.Clear();
         _mergersByCameraId.Clear();
         _mergedPacketsByCameraId.Clear();
     }
 
-    /// <summary>シーンの Receiver と Tracker を探す。無効なものも含める (あとで有効になったら、受信を開き直す)。</summary>
-    private void FindReceiversAndTrackers()
-    {
-        _foundReceivers.Clear();
-        _foundTrackers.Clear();
-#if UNITY_2022_2_OR_NEWER
-        _foundReceivers.AddRange(FindObjectsByType<FreeDReceiver>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
-        _foundTrackers.AddRange(FindObjectsByType<FreeDTracker>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
-#else
-        _foundReceivers.AddRange(FindObjectsOfType<FreeDReceiver>(true));
-        _foundTrackers.AddRange(FindObjectsOfType<FreeDTracker>(true));
-#endif
-    }
-
-    /// <summary>同じ項目を 2 つの Receiver が担当していると、合成できない。</summary>
-    private bool HasOverlappedFields()
-    {
-        var claimed = FreeDFields.None;
-        foreach (FreeDReceiver receiver in _foundReceivers)
-        {
-            if (!receiver.isActiveAndEnabled)
-            {
-                continue;
-            }
-            FreeDFields overlapped = claimed & receiver.Fields;
-            if (overlapped != FreeDFields.None)
-            {
-                Debug.LogError("FreeD: 同じ項目を複数の Receiver が担当している: " + overlapped, this);
-                return true;
-            }
-            claimed |= receiver.Fields;
-        }
-        return false;
-    }
-
-    /// <summary>ポート・項目・本数・有効か無効かのどれかが変わると値が変わる。再生中の設定変更で受信をやり直す目印。</summary>
-    private int Signature()
+    /// <summary>Receiver の数・ポート・使う項目・有効か無効かのどれかが変わると、値が変わる。</summary>
+    private int ReceiverSettingsHash()
     {
         unchecked
         {
-            int hash = _foundReceivers.Count;
-            foreach (FreeDReceiver receiver in _foundReceivers)
+            int hash = _sceneReceivers.Count;
+            foreach (FreeDReceiver receiver in _sceneReceivers)
             {
-                hash = hash * 31 + receiver.port * 31 + (int)receiver.Fields;
-                hash = hash * 31 + (receiver.isActiveAndEnabled ? 1 : 0);
+                // 再生中に消された Receiver も、変化として扱う (開き直すときに、シーンから探し直す)。
+                bool isOpenable = receiver != null && receiver.isActiveAndEnabled;
+                hash = hash * 31 + receiver.port * 31 + (int)receiver.UsedFields;
+                hash = hash * 31 + (isOpenable ? 1 : 0);
             }
             return hash;
-        }
-    }
-
-    /// <summary>各 Receiver が保持しているパケットを、届いた順にすべて取り出して、カメラ ID ごとの Merger に渡す。</summary>
-    private void PollReceivers()
-    {
-        for (var i = 0; i < _openedReceivers.Count; i++)
-        {
-            while (_openedReceivers[i].TryDequeue(out var received))
-            {
-                int cameraId = received.packet.CameraId;
-                if (!_mergersByCameraId.TryGetValue(cameraId, out FreeDMerger merger))
-                {
-                    var fields = new List<FreeDFields>();
-                    foreach (FreeDReceiver receiver in _openedReceivers)
-                    {
-                        fields.Add(receiver.Fields);
-                    }
-                    merger = new FreeDMerger(fields);
-                    _mergersByCameraId[cameraId] = merger;
-                }
-                merger.Put(i, received.packet, received.receivedMs);
-            }
-        }
-    }
-
-    /// <summary>カメラ ID ごとに、遅延を過ぎたパケットを合成して、Tracker に渡す値にする。</summary>
-    private void MergeAll(double nowMs)
-    {
-        foreach (KeyValuePair<int, FreeDMerger> pair in _mergersByCameraId)
-        {
-            FreeDMerger merger = pair.Value;
-            for (int receiverIndex = 0; receiverIndex < _openedReceivers.Count; receiverIndex++)
-            {
-                merger.SetDelay(receiverIndex, _openedReceivers[receiverIndex].delayMs);
-            }
-            FreeDFields filled = merger.Update(nowMs, out FreeDPacket packet);
-            if (filled != FreeDFields.None)
-            {
-                _mergedPacketsByCameraId[pair.Key] = packet;
-            }
         }
     }
 }

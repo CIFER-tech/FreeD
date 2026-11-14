@@ -2,19 +2,20 @@ using FreeD;
 using UnityEngine;
 
 /// <summary>
-/// カメラ ID を指定して、FreeDManager が合成した FreeD の値を受け取り、このオブジェクト (カメラ) の位置・向き・レンズに反映する。
-/// 反映は FreeDManager が毎フレーム行う (Unity の Update などは使わない)。
-/// 親オブジェクトが retroloc の原点になる。親の Position と Rotation の Y が、retroloc の原点の位置と水平の向きになる。
+/// MVP の View。cameraId のカメラの FreeD の値を、このオブジェクト (カメラ) の位置・向き・レンズに反映する。
+/// 反映は FreeDManager が毎フレーム呼ぶ。Unity のライフイベントは使わない。
+/// 親のオブジェクトが retroloc の原点。親の Position と Rotation の Y が、原点の位置と水平の向きになる。
 /// Scene ビューの青い矢印 (前) が retroloc の Y 方向、赤い矢印 (右) が X 方向。
-/// retroloc のワールド (X=右, Y=前, Z=上, m) を Unity に変換する。
-/// 回転は R = Rz(パン) · Rx(チルト) · Ry(ロール)。パンは反時計回りが正、チルトは上向きが正。
-/// ズームとフォーカスの生の値 (24bit のエンコーダ値) は、実測した点を入れた AnimationCurve で、
-/// カメラの焦点距離 (mm) とピント距離 (m) に直す (対応はレンズごとに違う)。キーのない曲線は反映しない。
+/// ズームとフォーカスの生の値 (24bit のエンコーダ値) は、実測した点を入れた AnimationCurve で
+/// 焦点距離 (mm) とピント距離 (m) に直す (対応はレンズごとに違う)。キーのない曲線は反映しない。
 /// </summary>
 [RequireComponent(typeof(Camera))]
 [DisallowMultipleComponent]
 public class FreeDTracker : MonoBehaviour
 {
+    // Scene ビューに描く原点の矢印の長さ (m)
+    private const float GizmoArrowLengthM = 0.5f;
+
     [Tooltip("使うカメラ ID。送信側の FreeD送信 のカメラ ID と同じにする")]
     public int cameraId = 1;
 
@@ -36,55 +37,46 @@ public class FreeDTracker : MonoBehaviour
     [Tooltip("横軸 = フォーカスの生の値、縦軸 = ピント距離 (m)")]
     public AnimationCurve focusToDistanceM = new AnimationCurve();
 
+    // Awake を使わないので、初めて反映するときに取る。
     private Camera _camera;
 
-    /// <summary>FreeDManager が毎フレーム呼ぶ。合成した値を、このオブジェクトの位置・向き・レンズに反映する。</summary>
-    internal void Apply(FreeDPacket packet)
+    internal void Apply(in FreeDPacket packet)
     {
-        var position = new Vector3(
-            (float)packet.XMeters * positionScale.x,
-            (float)packet.YMeters * positionScale.y,
-            (float)packet.ZMeters * positionScale.z);
-        var rotation = new Vector3(
-            (float)packet.PanDegrees * rotationScale.x,
-            (float)packet.TiltDegrees * rotationScale.y,
-            (float)packet.RollDegrees * rotationScale.z);
-
-        // retroloc 座標 (X右 Y前 Z上) の姿勢。AngleAxis は数値的に標準の回転なので、そのまま合成できる。
+        // retroloc のワールド座標 (X=右, Y=前, Z=上, m) での姿勢。
+        // 回転は Rz(パン) · Rx(チルト) · Ry(ロール)。パンは反時計回り、チルトは上向きが正。
         // 回転を担当する Receiver がないときは角度が 0 なので、単位回転になる。
-        Quaternion q = Rot(rotation);
+        Quaternion retrolocRotation =
+            Quaternion.AngleAxis((float)packet.PanDegrees * rotationScale.x, Vector3.forward)
+            * Quaternion.AngleAxis((float)packet.TiltDegrees * rotationScale.y, Vector3.right)
+            * Quaternion.AngleAxis((float)packet.RollDegrees * rotationScale.z, Vector3.up);
 
-        // Unity 座標へ変換してから、Unity のカメラのローカル軸でオフセットを適用する
-        var uPos = new Vector3(position.x, position.z, position.y);
-        var uRot = new Quaternion(-q.x, -q.z, -q.y, q.w);
-        transform.localPosition = uPos + uRot * positionOffset;
-        transform.localRotation = uRot * Quaternion.Euler(rotationOffset);
+        // retroloc の (X, Y, Z) を Unity の (x, z, y) に入れ替える。Y と Z の入れ替えで左右の手系が変わるので、回転の向きも反転する。
+        var unityPosition = new Vector3(
+            (float)packet.XMeters * positionScale.x,
+            (float)packet.ZMeters * positionScale.z,
+            (float)packet.YMeters * positionScale.y);
+        var unityRotation = new Quaternion(-retrolocRotation.x, -retrolocRotation.z, -retrolocRotation.y, retrolocRotation.w);
+
+        // オフセットは Unity のカメラのローカル軸で適用する。
+        transform.localPosition = unityPosition + unityRotation * positionOffset;
+        transform.localRotation = unityRotation * Quaternion.Euler(rotationOffset);
 
         if (_camera == null)
         {
             _camera = GetComponent<Camera>();
         }
-
         if (zoomToFocalLengthMm.length > 0)
         {
             _camera.usePhysicalProperties = true;
             _camera.focalLength = zoomToFocalLengthMm.Evaluate(packet.ZoomRaw);
         }
-
 #if UNITY_2022_2_OR_NEWER
+        // Camera.focusDistance は Unity 2022.2 から。
         if (focusToDistanceM.length > 0)
         {
             _camera.focusDistance = focusToDistanceM.Evaluate(packet.FocusRaw);
         }
 #endif
-    }
-
-    /// <param name="panTiltRollDeg">X=パン, Y=チルト, Z=ロール (度)</param>
-    private static Quaternion Rot(Vector3 panTiltRollDeg)
-    {
-        return Quaternion.AngleAxis(panTiltRollDeg.x, new Vector3(0, 0, 1))
-               * Quaternion.AngleAxis(panTiltRollDeg.y, new Vector3(1, 0, 0))
-               * Quaternion.AngleAxis(panTiltRollDeg.z, new Vector3(0, 1, 0));
     }
 
     private void OnDrawGizmos()
@@ -94,10 +86,10 @@ public class FreeDTracker : MonoBehaviour
         Vector3 originPosition = origin != null ? origin.position : Vector3.zero;
         Quaternion originRotation = origin != null ? origin.rotation : Quaternion.identity;
         Gizmos.color = Color.red;
-        Gizmos.DrawLine(originPosition, originPosition + originRotation * Vector3.right * 0.5f);
+        Gizmos.DrawLine(originPosition, originPosition + originRotation * Vector3.right * GizmoArrowLengthM);
         Gizmos.color = Color.green;
-        Gizmos.DrawLine(originPosition, originPosition + originRotation * Vector3.up * 0.5f);
+        Gizmos.DrawLine(originPosition, originPosition + originRotation * Vector3.up * GizmoArrowLengthM);
         Gizmos.color = Color.blue;
-        Gizmos.DrawLine(originPosition, originPosition + originRotation * Vector3.forward * 0.5f);
+        Gizmos.DrawLine(originPosition, originPosition + originRotation * Vector3.forward * GizmoArrowLengthM);
     }
 }
