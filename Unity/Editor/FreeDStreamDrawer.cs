@@ -5,7 +5,7 @@ using UnityEngine;
 [CustomPropertyDrawer(typeof(FreeDReceiver.Stream))]
 public class FreeDStreamDrawer : PropertyDrawer
 {
-    static readonly string[] SettingNames = { "port", "cameraId", "fields", "delayMs" };
+    static readonly string[] SettingNames = { "port", "cameraId", "fields", "rotationScale", "delayMs" };
     static readonly string[] StatusNames = { "receiving", "packetsPerSecond", "meanIntervalMs", "maxIntervalMs" };
 
     // 枠の余白は、FreeDReceiver 本体の状態の枠 (EditorStyles.helpBox) と同じ既定値を使う。

@@ -29,6 +29,9 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
         [Tooltip("このストリームから使う項目 (同じ項目は 1 つのストリームだけ)")]
         public FreeDFields fields = AllFields;
 
+        [Tooltip("このストリームの角度にかける倍率。X=パン, Y=チルト, Z=ロール。向きが逆なら -1")]
+        public Vector3 rotationScale = Vector3.one;
+
         [Tooltip("ms。他のストリームより早く届くときに、この分だけ反映を遅らせてそろえる")]
         public float delayMs = 0f;
 
@@ -73,11 +76,6 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
     [Header("受信")]
     public List<Stream> streams = new List<Stream> { new Stream() };
 
-    [Header("符号 (向きが逆なら -1)")]
-    public float panSign = 1f;
-    public float tiltSign = 1f;
-    public float rollSign = 1f;
-
     [Header("手動オフセット (カメラ取り付けのずれ。Unity 座標)")]
     [Tooltip("トラッカーからカメラまで (Unity のカメラの軸: X=右, Y=上, Z=前, m)")]
     public Vector3 positionOffset = Vector3.zero;
@@ -92,6 +90,11 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
     [Tooltip("ズームのエンコーダの生の値 (24bit)。FreeDLens が焦点距離に直す"), FreeDReadOnly] public uint zoomRaw;
     [FreeDReadOnly] public bool hasFocus;
     [Tooltip("フォーカスのエンコーダの生の値 (24bit)。FreeDLens がピント距離に直す"), FreeDReadOnly] public uint focusRaw;
+
+    // 1.3.0 までの設定 (角度の倍率が、ストリームごとではなくカメラ全体で 1 組だった)。読み込んだときに、回転を使うストリームの rotationScale へ移す。
+    [SerializeField, HideInInspector, FormerlySerializedAs("panSign")] private float _legacyPanScale = 1f;
+    [SerializeField, HideInInspector, FormerlySerializedAs("tiltSign")] private float _legacyTiltScale = 1f;
+    [SerializeField, HideInInspector, FormerlySerializedAs("rollSign")] private float _legacyRollScale = 1f;
 
     // 1.2 までの設定 (ストリームが 1 本だけだった)。読み込んだときに streams の 1 本目へ移す。
     [SerializeField, HideInInspector, FormerlySerializedAs("port")] private int _legacyPort = -1;
@@ -112,9 +115,21 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
 
     public void OnAfterDeserialize()
     {
-        if (_legacyPort < 0) return;
-        streams = new List<Stream> { new Stream { port = _legacyPort, cameraId = _legacyCameraId } };
-        _legacyPort = -1;
+        if (_legacyPort >= 0)
+        {
+            streams = new List<Stream> { new Stream { port = _legacyPort, cameraId = _legacyCameraId } };
+            _legacyPort = -1;
+        }
+        MoveLegacyScaleToStreams();
+    }
+
+    void MoveLegacyScaleToStreams()
+    {
+        var legacyScale = new Vector3(_legacyPanScale, _legacyTiltScale, _legacyRollScale);
+        if (legacyScale == Vector3.one) return;
+        foreach (Stream s in streams)
+            if ((s.Fields & FreeDFields.Rotation) != 0) s.rotationScale = Vector3.Scale(s.rotationScale, legacyScale);
+        _legacyPanScale = _legacyTiltScale = _legacyRollScale = 1f;
     }
 
     void OnValidate() { ResolveOverlaps(); }
@@ -208,6 +223,8 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
                 byte[] data = udp.Receive(ref any);
                 if (!FreeDCodec.TryDecode(data, out FreeDPacket p)) continue;
                 if (stream.cameraId != 0 && p.CameraId != stream.cameraId) continue;
+                Vector3 scale = stream.rotationScale;
+                p.PanDegrees *= scale.x; p.TiltDegrees *= scale.y; p.RollDegrees *= scale.z;
                 double now = _sw.Elapsed.TotalMilliseconds;
                 lock (_lock)
                 {
@@ -279,7 +296,7 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
 
         // retroloc 座標 (X右 Y前 Z上) の姿勢。AngleAxis は数値的に標準の回転なので、そのまま合成できる。
         // 回転のストリームがないときは p の角度が 0 なので、単位回転になる。
-        Quaternion q = Rot((float)p.PanDegrees * panSign, (float)p.TiltDegrees * tiltSign, (float)p.RollDegrees * rollSign);
+        Quaternion q = Rot((float)p.PanDegrees, (float)p.TiltDegrees, (float)p.RollDegrees);
         Vector3 pos = new Vector3((float)p.XMeters, (float)p.YMeters, (float)p.ZMeters);
 
         // Unity 座標へ変換してから、Unity のカメラのローカル軸でオフセットを適用する
