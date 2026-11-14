@@ -83,6 +83,12 @@ namespace CIFER.tech.FreeD.Core
                 }
                 catch (SocketException e)
                 {
+                    // バッファより大きなデータグラムは FreeD ではないので、捨てて受信を続ける。
+                    if (e.SocketErrorCode == SocketError.MessageSize)
+                    {
+                        continue;
+                    }
+
                     // Close で中断されたときも SocketException になる。そのときは正常な終了。
                     if (e.SocketErrorCode != SocketError.Interrupted && e.SocketErrorCode != SocketError.OperationAborted)
                     {
