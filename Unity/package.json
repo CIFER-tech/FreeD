@@ -5,7 +5,7 @@
   "description": "FreeD (D1, 29 バイト) メッセージの符号化・復号ライブラリ。カメラトラッキングデータ (パン/チルト/ロール/位置/ズーム/フォーカス) をUDP等で送受信する際のパケットを扱う。",
   "unity": "2021.2",
   "dependencies": {
-    "tech.cifer.ringbuffer": "3.0.0"
+    "tech.cifer.ringbuffer": "3.0.1"
   },
   "author": {
     "name": "CIFER.tech"
