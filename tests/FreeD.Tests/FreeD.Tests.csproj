@@ -15,8 +15,14 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
 
+  <!-- ソースは Unity パッケージ (Unity/Runtime/Core) に置いたままで、テストが直接コンパイルする。DLL は作らない -->
   <ItemGroup>
-    <ProjectReference Include="..\..\src\FreeD\FreeD.csproj" />
+    <Compile Include="..\..\Unity\Runtime\Core\**\*.cs" />
+  </ItemGroup>
+
+  <!-- FreeDReceiver が使う。RingBuffer のリポジトリを、このリポジトリの隣に置く -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\RingBuffer\src\RingBuffer\RingBuffer.csproj" />
   </ItemGroup>
 
 </Project>
