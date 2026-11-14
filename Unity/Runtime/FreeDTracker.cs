@@ -1,6 +1,5 @@
 using FreeD;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 /// <summary>
 /// カメラ ID を指定して、FreeDManager が合成した FreeD の値を受け取り、このオブジェクト (カメラ) の位置・向き・レンズに反映する。
@@ -37,41 +36,19 @@ public class FreeDTracker : MonoBehaviour
     [Tooltip("横軸 = フォーカスの生の値、縦軸 = ピント距離 (m)")]
     public AnimationCurve focusToDistanceM = new AnimationCurve();
 
-    // 状態の欄は FreeDTrackerEditor が枠で囲んで描く (Header は付けない)
-    [FreeDReadOnly] public bool receiving;
-
-    [FormerlySerializedAs("panTiltRollDeg")] [Tooltip("度。X=パン, Y=チルト, Z=ロール (倍率をかけたあと)"), FreeDReadOnly]
-    public Vector3 rotation;
-
-    [FormerlySerializedAs("positionMm")] [Tooltip("m。FreeD 座標 (X=右, Y=前, Z=上) (倍率をかけたあと)"), FreeDReadOnly]
-    public Vector3 position;
-
-    [Tooltip("ズームのエンコーダの生の値 (24bit)"), FreeDReadOnly]
-    public uint zoomRaw;
-
-    [Tooltip("フォーカスのエンコーダの生の値 (24bit)"), FreeDReadOnly]
-    public uint focusRaw;
-
-    [FreeDReadOnly] public float focalLengthMm;
-
-    [Tooltip("ピントが合う距離 (m)。被写界深度のエフェクトなど、使う側がこの値を読む"), FreeDReadOnly]
-    public float focusDistanceM;
-
     private Camera _camera;
 
     /// <summary>FreeDManager が毎フレーム呼ぶ。合成した値を、このオブジェクトの位置・向き・レンズに反映する。</summary>
     internal void Apply(FreeDPacket packet)
     {
-        position = new Vector3(
+        var position = new Vector3(
             (float)packet.XMeters * positionScale.x,
             (float)packet.YMeters * positionScale.y,
             (float)packet.ZMeters * positionScale.z);
-        rotation = new Vector3(
+        var rotation = new Vector3(
             (float)packet.PanDegrees * rotationScale.x,
             (float)packet.TiltDegrees * rotationScale.y,
             (float)packet.RollDegrees * rotationScale.z);
-        zoomRaw = packet.ZoomRaw;
-        focusRaw = packet.FocusRaw;
 
         // retroloc 座標 (X右 Y前 Z上) の姿勢。AngleAxis は数値的に標準の回転なので、そのまま合成できる。
         // 回転を担当する Receiver がないときは角度が 0 なので、単位回転になる。
@@ -90,18 +67,16 @@ public class FreeDTracker : MonoBehaviour
 
         if (zoomToFocalLengthMm.length > 0)
         {
-            focalLengthMm = zoomToFocalLengthMm.Evaluate(zoomRaw);
             _camera.usePhysicalProperties = true;
-            _camera.focalLength = focalLengthMm;
+            _camera.focalLength = zoomToFocalLengthMm.Evaluate(packet.ZoomRaw);
         }
 
+#if UNITY_2022_2_OR_NEWER
         if (focusToDistanceM.length > 0)
         {
-            focusDistanceM = focusToDistanceM.Evaluate(focusRaw);
-#if UNITY_2022_2_OR_NEWER
-            _camera.focusDistance = focusDistanceM;
-#endif
+            _camera.focusDistance = focusToDistanceM.Evaluate(packet.FocusRaw);
         }
+#endif
     }
 
     /// <param name="panTiltRollDeg">X=パン, Y=チルト, Z=ロール (度)</param>
