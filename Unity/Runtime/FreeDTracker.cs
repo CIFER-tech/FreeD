@@ -34,6 +34,9 @@ public class FreeDTracker : MonoBehaviour
     [FreeDReadOnly] public bool hasFocus;
     [Tooltip("フォーカスのエンコーダの生の値 (24bit)。FreeDLens がピント距離に直す"), FreeDReadOnly] public uint focusRaw;
 
+    /// <summary>同じオブジェクトの FreeDLens。FreeDManager が、探すときに入れる。</summary>
+    [System.NonSerialized] internal FreeDLens lens;
+
     /// <summary>FreeDManager が毎フレーム呼ぶ。合成した値を、このオブジェクトの位置と向きに反映する。</summary>
     internal void Apply(FreeDFields filled, FreeDPacket p, bool isReceiving)
     {
@@ -81,6 +84,11 @@ public class FreeDTracker : MonoBehaviour
         if (hasRotation)
         {
             transform.localRotation = uRot * Quaternion.Euler(rotationOffset);
+        }
+
+        if (lens != null)
+        {
+            lens.Apply(hasZoom, zoomRaw, hasFocus, focusRaw);
         }
     }
 

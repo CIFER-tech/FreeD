@@ -50,6 +50,16 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 
 座標は retroloc のワールド (X=右, Y=前, Z=上, m) から Unity へ `(x, y, z) → (x, z, y)` で変換する。
 
+### 設計 (MVP)
+
+| 役割 | コンポーネント | 持つもの |
+| --- | --- | --- |
+| Model | `FreeDReceiver` | ポートで受信した値と、その受信状態。ほかを知らない |
+| View | `FreeDTracker`、`FreeDLens` | 受け取った値の表示 (カメラの位置・向き・レンズ)。ほかを知らない |
+| Presenter | `FreeDManager` | Model と View の寿命、毎フレームの取り出し・合成・反映 |
+
+Model と View は、Unity の `Awake`・`OnEnable`・`Update` などを使わない。動かすのは Presenter だけで、Model と View は互いを参照しない。
+
 ### 複数のポートを合成する (姿勢 + レンズ)
 
 姿勢は retroloc、ズームとフォーカスは別のシステム、のように別々のポートで届くときは、`FreeDReceiver` をポートごとに置き、使う項目を選ぶ。
