@@ -1,7 +1,9 @@
 {
     "name": "FreeD.Unity",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "RingBuffer"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

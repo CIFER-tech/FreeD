@@ -33,6 +33,14 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 
 詳しいメッセージ配置・仕様の注意点はリポジトリ直下の [README](../README.md) を参照。
 
+## 必要なパッケージ
+
+受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) を使う。`Packages/manifest.json` の `dependencies` に足しておく (FreeD と同じ置き方なら、次のとおり)。
+
+```json
+"tech.cifer.ringbuffer": "file:../../../RingBuffer/Unity"
+```
+
 ## 受信コンポーネント (FreeDManager・FreeDReceiver・FreeDTracker)
 
 3 つのコンポーネントに分かれている。

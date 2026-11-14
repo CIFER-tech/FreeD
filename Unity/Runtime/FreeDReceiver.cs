@@ -2,6 +2,8 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
+using Cifer.Collections;
 using FreeD;
 using UnityEngine;
 
@@ -14,13 +16,10 @@ using UnityEngine;
 public class FreeDReceiver : MonoBehaviour
 {
     // Inspector で Everything を選ぶと全ビットが立った -1 になるので、項目のビットだけに絞って使う。
-    private const FreeDFields AllFields = FreeDFields.Position | FreeDFields.Rotation | FreeDFields.Zoom | FreeDFields.Focus;
+    private const FreeDFields AllFields =
+        FreeDFields.Position | FreeDFields.Rotation | FreeDFields.Zoom | FreeDFields.Focus;
 
-    // UDP のデータグラムが入る大きさ (イーサネットの MTU)。これより大きなデータグラムは受信でエラーになり、捨てる。
-    private const int ReceiveBufferSize = 1500;
-
-    [Tooltip("送信側の FreeD送信 のポートと同じにする")]
-    public int port = 40000;
+    [Tooltip("送信側の FreeD送信 のポートと同じにする")] public int port = 40000;
 
     [Tooltip("このポートから使う項目 (同じ項目は 1 つの Receiver だけ)")]
     public FreeDFields fields = AllFields;
@@ -28,163 +27,67 @@ public class FreeDReceiver : MonoBehaviour
     [Tooltip("ms。他のポートより早く届くときに、この分だけ反映を遅らせてそろえる")]
     public float delayMs = 0f;
 
-    // 受信のたびに確保しないよう、バッファと SocketAsyncEventArgs は使い回す。
-    private readonly byte[] _receiveBuffer = new byte[ReceiveBufferSize];
-    private readonly FreeDReceivedPacketQueue _receivedPackets = new FreeDReceivedPacketQueue();
-    private Socket _socket;
-    private SocketAsyncEventArgs _receiveArgs;
-    private CancellationTokenSource _cancellation;
+    // 受信したパケットを、FreeDManager が取りに来るまでためておく数。60 fps で数秒ぶん。
+    // 取りに来ない間も、あふれたら古いものを捨てるので、メモリは増えない。
+    private const int ReceivedPacketCapacity = 256;
 
-    // 開こうとしたか (失敗したときも true)。開こうとしたときのポート。
-    private bool _isOpenRequested;
-    private int _requestedPort;
+    private readonly RingBuffer<FreeDReceivedPacket> receivedPackets = new(ReceivedPacketCapacity);
 
-    // 前回の Sync のときの ActiveFields。変わったことを Manager に知らせるために覚えておく。
-    private FreeDFields _syncedActiveFields;
+    private UdpClient client;
+    private CancellationTokenSource tokenSource;
 
     /// <summary>いま担当している項目。無効なときは None。</summary>
-    internal FreeDFields ActiveFields
-    {
-        get
-        {
-            return isActiveAndEnabled ? fields & AllFields : FreeDFields.None;
-        }
-    }
+    public FreeDFields ActiveFields => isActiveAndEnabled ? fields & AllFields : FreeDFields.None;
 
-    /// <summary>
-    /// 有効か無効か、ポートが変わったかに合わせて、受信を開く・閉じる。FreeDManager が毎フレーム呼ぶ。
-    /// 開くのに失敗したときは、無効にするかポートを変えるまで、開き直さない (毎フレーム、エラーを出さないため)。
-    /// </summary>
-    /// <returns>前回の呼び出しから、担当する項目 (ActiveFields) が変わったか。</returns>
-    internal bool Sync()
-    {
-        bool shouldOpen = isActiveAndEnabled;
-        if (_isOpenRequested && (!shouldOpen || _requestedPort != port))
-        {
-            Close();
-        }
-
-        if (!_isOpenRequested && shouldOpen)
-        {
-            _isOpenRequested = true;
-            _requestedPort = port;
-            Open();
-        }
-
-        FreeDFields activeFields = ActiveFields;
-        bool isFieldsChanged = activeFields != _syncedActiveFields;
-        _syncedActiveFields = activeFields;
-        return isFieldsChanged;
-    }
-
-    private void Open()
+    public void Open()
     {
         try
         {
-            _socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            _socket.Bind(new IPEndPoint(IPAddress.Any, port));
+            client = new UdpClient(port);
         }
         catch (Exception e)
         {
             Debug.LogError("FreeD: ポート " + port + " を開けない: " + e.Message, this);
-            CloseSocket();
+            Close();
             return;
         }
 
-        _cancellation = new CancellationTokenSource();
-        _receiveArgs = new SocketAsyncEventArgs();
-        _receiveArgs.SetBuffer(_receiveBuffer, 0, _receiveBuffer.Length);
-        _receiveArgs.Completed += OnReceiveCompleted;
-        ReceiveUntilPending(_cancellation.Token);
+        tokenSource = new CancellationTokenSource();
+        Task.Run(() => ReceiveTask(tokenSource.Token));
     }
 
-    internal void Close()
+    public void Close()
     {
-        _isOpenRequested = false;
-        if (_cancellation != null)
-        {
-            _cancellation.Cancel();
-        }
-        // 受信待ちは、ソケットを閉じると OperationAborted で完了する。
-        CloseSocket();
-        if (_receiveArgs != null)
-        {
-            _receiveArgs.Completed -= OnReceiveCompleted;
-            _receiveArgs.Dispose();
-            _receiveArgs = null;
-        }
-        if (_cancellation != null)
-        {
-            _cancellation.Dispose();
-            _cancellation = null;
-        }
-        _receivedPackets.Clear();
-    }
+        tokenSource.Cancel();
 
-    /// <summary>受信して復号したパケットを、届いた順に 1 つずつ取り出す。</summary>
-    internal bool TryDequeue(out FreeDReceivedPacket received)
-    {
-        return _receivedPackets.TryDequeue(out received);
-    }
-
-    // Open の失敗時と Close の 2 か所から呼ぶ。
-    private void CloseSocket()
-    {
-        if (_socket != null)
-        {
-            _socket.Close();
-            _socket = null;
-        }
+        client.Close();
+        client.Dispose();
+        client = null;
     }
 
     /// <summary>
     /// 受信を待つ。ReceiveAsync がその場で完了したとき (すでに届いていたとき) は Completed が呼ばれないので、
     /// ここで処理して、待ちに入るまで繰り返す。
     /// </summary>
-    private void ReceiveUntilPending(CancellationToken token)
+    private async Task ReceiveTask(CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
-            bool isPending;
-            try
+            var result = await client.ReceiveAsync();
+            if (FreeDCodec.TryDecode(result.Buffer, out var packet))
             {
-                isPending = _socket.ReceiveAsync(_receiveArgs);
+                receivedPackets.Enqueue(new FreeDReceivedPacket
+                {
+                    receivedMs = DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalMilliseconds,
+                    packet = packet
+                });
             }
-            catch (ObjectDisposedException)
-            {
-                return;
-            }
-            if (isPending)
-            {
-                return;
-            }
-            EnqueueReceived(_receiveArgs);
         }
     }
 
-    // 受信スレッド (スレッドプール) で呼ばれる。
-    private void OnReceiveCompleted(object sender, SocketAsyncEventArgs args)
+    /// <summary>受信して復号したパケットを、届いた順に 1 つずつ取り出す。</summary>
+    public bool TryDequeue(out FreeDReceivedPacket received)
     {
-        CancellationTokenSource cancellation = _cancellation;
-        if (cancellation == null || cancellation.IsCancellationRequested)
-        {
-            return;
-        }
-        EnqueueReceived(args);
-        ReceiveUntilPending(cancellation.Token);
-    }
-
-    /// <summary>受信したデータグラムを復号して、受信時刻つきでためる。復号できないデータは捨てる。</summary>
-    private void EnqueueReceived(SocketAsyncEventArgs args)
-    {
-        if (args.SocketError != SocketError.Success || args.BytesTransferred <= 0)
-        {
-            return;
-        }
-        var datagram = new ReadOnlySpan<byte>(_receiveBuffer, 0, args.BytesTransferred);
-        if (FreeDCodec.TryDecode(datagram, out FreeDPacket packet))
-        {
-            _receivedPackets.Enqueue(new FreeDReceivedPacket { packet = packet, receivedMs = FreeDClock.NowMs });
-        }
+        return receivedPackets.TryDequeue(out received);
     }
 }
