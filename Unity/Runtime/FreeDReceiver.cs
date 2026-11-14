@@ -32,6 +32,11 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
         [Tooltip("このストリームの角度にかける倍率。X=パン, Y=チルト, Z=ロール。向きが逆なら -1")]
         public Vector3 rotationScale = Vector3.one;
 
+        [Tooltip("トラッカーからカメラまで (Unity のカメラの軸: X=右, Y=上, Z=前, m)。位置を使うストリームだけに効く")]
+        public Vector3 positionOffset = Vector3.zero;
+        [Tooltip("度。Unity のカメラの軸まわり (X=チルト, Y=パン, Z=ロール)。Transform の Rotation と同じ向き。回転を使うストリームだけに効く")]
+        public Vector3 rotationOffset = Vector3.zero;
+
         [Tooltip("ms。他のストリームより早く届くときに、この分だけ反映を遅らせてそろえる")]
         public float delayMs = 0f;
 
@@ -76,11 +81,9 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
     [Header("受信")]
     public List<Stream> streams = new List<Stream> { new Stream() };
 
-    [Header("手動オフセット (カメラ取り付けのずれ。Unity 座標)")]
-    [Tooltip("トラッカーからカメラまで (Unity のカメラの軸: X=右, Y=上, Z=前, m)")]
-    public Vector3 positionOffset = Vector3.zero;
-    [Tooltip("度。Unity のカメラの軸まわり (X=チルト, Y=パン, Z=ロール)。Transform の Rotation と同じ向き")]
-    public Vector3 rotationOffset = Vector3.zero;
+    // 1.3.0 までの設定 (オフセットが、ストリームごとではなくカメラ全体で 1 組だった)。読み込んだときに、位置・回転を使うストリームへ移す。
+    [SerializeField, HideInInspector, FormerlySerializedAs("positionOffset")] private Vector3 _legacyPositionOffset;
+    [SerializeField, HideInInspector, FormerlySerializedAs("rotationOffset")] private Vector3 _legacyRotationOffset;
 
     // 状態の欄は FreeDReceiverEditor が枠で囲んで描く (Header は付けない)
     [FreeDReadOnly] public bool receiving;
@@ -121,6 +124,7 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
             _legacyPort = -1;
         }
         MoveLegacyScaleToStreams();
+        if (_legacyPositionOffset != Vector3.zero || _legacyRotationOffset != Vector3.zero) MoveLegacyOffsetsToStreams();
     }
 
     void MoveLegacyScaleToStreams()
@@ -130,6 +134,16 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
         foreach (Stream s in streams)
             if ((s.Fields & FreeDFields.Rotation) != 0) s.rotationScale = Vector3.Scale(s.rotationScale, legacyScale);
         _legacyPanScale = _legacyTiltScale = _legacyRollScale = 1f;
+    }
+
+    void MoveLegacyOffsetsToStreams()
+    {
+        foreach (Stream s in streams)
+        {
+            if ((s.Fields & FreeDFields.Position) != 0) s.positionOffset += _legacyPositionOffset;
+            if ((s.Fields & FreeDFields.Rotation) != 0) s.rotationOffset += _legacyRotationOffset;
+        }
+        _legacyPositionOffset = _legacyRotationOffset = Vector3.zero;
     }
 
     void OnValidate() { ResolveOverlaps(); }
@@ -302,8 +316,16 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
         // Unity 座標へ変換してから、Unity のカメラのローカル軸でオフセットを適用する
         Vector3 uPos = new Vector3(pos.x, pos.z, pos.y);
         Quaternion uRot = new Quaternion(-q.x, -q.z, -q.y, q.w);
-        if (hasPosition) transform.localPosition = uPos + uRot * positionOffset;
-        if (hasRotation) transform.localRotation = uRot * Quaternion.Euler(rotationOffset);
+        if (hasPosition) transform.localPosition = uPos + uRot * StreamUsing(FreeDFields.Position).positionOffset;
+        if (hasRotation) transform.localRotation = uRot * Quaternion.Euler(StreamUsing(FreeDFields.Rotation).rotationOffset);
+    }
+
+    /// <summary>項目を担当するストリーム。担当は 1 本だけ (重なりは ResolveOverlaps が防ぐ)。</summary>
+    Stream StreamUsing(FreeDFields field)
+    {
+        foreach (Stream s in streams)
+            if ((s.Fields & field) != 0) return s;
+        throw new InvalidOperationException("FreeD: " + field + " を担当するストリームがない");
     }
 
     static Quaternion Rot(float pan, float tilt, float roll)
