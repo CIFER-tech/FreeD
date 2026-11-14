@@ -6,15 +6,15 @@
 
 - `FreeDReceiver` を、受信・合成・反映をすべて持つ形から、3 つのコンポーネントに分けた (MVP)。
   - `FreeDManager` (新規、Presenter): シーンに 1 つ置く。Receiver と Tracker の寿命と毎フレームの処理をすべて持つ。各 Receiver のパケットを取り出し、カメラ ID ごとに合成して Tracker に反映する。シーンになければ、受信も反映も行われない。Receiver と Tracker は開始時にシーンから探す (あとから置いたものは、再生を始め直すまで対象にならない)。
-  - `FreeDReceiverForUnity` (Model): ポート 1 つで受信して、復号したパケットをためるだけ。受信そのものは、Unity に依存しない `FreeDReceiver` (Core) が行う。ポートごとに置き、使う項目 (`fields`) と遅延 (`delaySec`、秒) を持つ。`streams` は廃止。同じ項目を 2 つの Receiver が担当していると、Manager がエラーを出して受信を始めない。
-  - `FreeDTracker` (新規、View): `cameraId` を指定して値を受け取り、自分のオブジェクトの位置・向き・レンズに反映する。`rotationScale` (旧 `panSign` / `tiltSign` / `rollSign`。符号ではなく倍率としてかけるので改名)・`positionScale` (新規。位置にかける倍率)・`positionOffset` / `rotationOffset` を持つ。
+  - `FreeDReceiverForUnity` (Model): ポート 1 つで受信して、復号したパケットをためるだけ。受信そのものは、Unity に依存しない `FreeDReceiver` (Core) が行う。ポートごとに置き、使う項目 (`field`) と遅延 (`delaySec`、秒) を持つ。`streams` は廃止。同じ項目を 2 つの Receiver が担当していると、Manager がエラーを出して、反映を行わない。
+  - `FreeDTracker` (新規、View): `cameraId` を指定して値を受け取り、自分のオブジェクトの位置・向き・レンズに反映する。`rotationScale` (旧 `panSign` / `tiltSign` / `rollSign`。符号ではなく倍率としてかけるので改名)・`positionScale` (新規。位置にかける倍率)・`positionOffset` / `rotationOffset` を持つ。ズームとフォーカスは、`Camera` の欄に割り当てたカメラへ反映する (欄が空だと反映しない)。設定は private な `SerializeField` と public プロパティで持つ。
   - Receiver と Tracker は、Unity の `Awake`・`OnEnable`・`Update` などを使わない。
 - `FreeD.dll` の同梱をやめ、ソースを `Runtime/Core/` に置いて Unity に依存しないアセンブリ `CIFER.tech.FreeD.Core` でコンパイルする (コンポーネントは `Runtime/Unity/` の `CIFER.tech.FreeD.Unity`)。名前空間は `FreeD` から `CIFER.tech.FreeD.Core` に変わる。`src/FreeD/FreeD.csproj` は同じソースを取り込む。DLL の同期ワークフローは廃止。
 - 受信したパケットは、固定サイズのリングバッファにためる。Manager が取りに来ない間にあふれたら、古いものを捨てる。
 - 受信したパケットをためる待ち行列を、自前の実装から、パッケージ `tech.cifer.ringbuffer` の `RingBuffer<T>` に置き換えた。FreeD を使うプロジェクトの `Packages/manifest.json` に、このパッケージを足す必要がある。
 - `FreeDOrigin` を廃止。`FreeDTracker` の親のオブジェクトが原点になる。親の Position と Rotation の Y で、原点の位置と向きを決める。
 - `FreeDLens` を廃止し、ズーム・フォーカスの AnimationCurve と焦点距離・ピント距離の反映を `FreeDTracker` に統合した。
-- 使う項目を、4 つのチェックボックスから、複数選べるドロップダウン (`FreeDFields`) に変更。並びは Position・Rotation・Zoom・Focus。
+- 使う項目を、4 つのチェックボックスから、複数選べるドロップダウン (`FreeDField`) に変更。並びは Position・Rotation・Zoom・Focus。
 - 状態の表示を廃止。Inspector の状態の欄 (受信中・pkt/s・受信間隔・角度・位置・ズームとフォーカスの値など) と、再生中の左上の表示 (OnGUI) を消した。
 
 ## [1.3.0] - 2026-10-30
