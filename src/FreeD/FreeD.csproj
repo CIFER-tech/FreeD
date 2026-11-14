@@ -8,6 +8,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <Deterministic>true</Deterministic>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <PropertyGroup>
