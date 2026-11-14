@@ -62,7 +62,7 @@ namespace CIFER.tech.FreeD.Unity
         public void Apply(in FreeDPacket packet)
         {
             // FreeD 座標 (X=右, Y=前, Z=上, m) での姿勢。
-            // 回転は Rz(パン) · Rx(チルト) · Ry(ロール)。パンは反時計回り、チルトは上向きが正。
+            // 回転は Rz(パン) · Rx(チルト) · Ry(ロール)。角度の正の向きは送信機器の仕様によるので、向きが逆なら rotationScale で反転する。
             // 回転を担当する Receiver がないときは角度が 0 なので、単位回転になる。
             var freeDRotation =
                 Quaternion.AngleAxis((float)packet.PanDegrees * rotationScale.x, Vector3.forward)
