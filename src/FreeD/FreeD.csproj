@@ -3,8 +3,8 @@
   <!-- ソースは Unity パッケージ (Unity/Runtime/Core) に置き、Unity と .NET のアプリで同じソースを使う。DLL は作って同梱しない -->
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
-    <RootNamespace>FreeD</RootNamespace>
-    <AssemblyName>FreeD</AssemblyName>
+    <RootNamespace>CIFER.tech.FreeD.Core</RootNamespace>
+    <AssemblyName>CIFER.tech.FreeD.Core</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <Deterministic>true</Deterministic>
