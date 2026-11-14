@@ -34,9 +34,6 @@ public class FreeDReceiver : MonoBehaviour
     [Tooltip("直近1秒の受信間隔 (ms)"), FreeDReadOnly]
     public float meanIntervalMs, maxIntervalMs;
 
-    /// <summary>有効な Receiver。FreeDManager がここから受信を開始する。</summary>
-    internal static readonly List<FreeDReceiver> Active = new List<FreeDReceiver>();
-
     // 受信スレッドが書き、FreeDManager の Update が読む。FreeDManager の _lock で守る。
     [NonSerialized] internal int count;
     [NonSerialized] internal double sumIntervalMs, maxIntervalMsSoFar, lastReceivedMs = -1;
@@ -52,8 +49,14 @@ public class FreeDReceiver : MonoBehaviour
         set { fields = value; }
     }
 
-    void OnEnable() { Active.Add(this); }
-    void OnDisable() { Active.Remove(this); }
+    // 有効・無効が変わったことを Manager に知らせる。受信を開き直すのは Manager。
+    void OnEnable() { NotifyManager(); }
+    void OnDisable() { NotifyManager(); }
+
+    static void NotifyManager()
+    {
+        if (FreeDManager.Instance != null) FreeDManager.Instance.MarkReceiversChanged();
+    }
 
     void OnValidate()
     {

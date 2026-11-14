@@ -47,6 +47,9 @@ public class FreeDManager : MonoBehaviour
     private readonly List<FreeDReceiver> _receivers = new List<FreeDReceiver>();
     private readonly Dictionary<int, FreeDMerger> _mergersByCameraId = new Dictionary<int, FreeDMerger>();
     private readonly Dictionary<int, Merged> _mergedByCameraId = new Dictionary<int, Merged>();
+    // シーンから見つけた有効な Receiver。重なりなどで開けなかったものも含む。
+    private readonly List<FreeDReceiver> _foundReceivers = new List<FreeDReceiver>();
+    private bool _isReceiverSetChanged;
     private int _openedSignature;
     private float _rateTimerSeconds;
 
@@ -66,7 +69,7 @@ public class FreeDManager : MonoBehaviour
 
     void Update()
     {
-        if (Signature() != _openedSignature)
+        if (_isReceiverSetChanged || Signature() != _openedSignature)
         {
             CloseReceivers();
             OpenReceivers();
@@ -95,11 +98,16 @@ public class FreeDManager : MonoBehaviour
         return false;
     }
 
+    /// <summary>FreeDReceiver が、有効・無効が変わったときに呼ぶ。次の Update で、受信を開き直す。</summary>
+    internal void MarkReceiversChanged() { _isReceiverSetChanged = true; }
+
     void OpenReceivers()
     {
+        _isReceiverSetChanged = false;
+        FindEnabledReceivers();
         _openedSignature = Signature();
         var claimed = FreeDFields.None;
-        foreach (FreeDReceiver r in FreeDReceiver.Active)
+        foreach (FreeDReceiver r in _foundReceivers)
         {
             FreeDFields overlapped = claimed & r.Fields;
             if (overlapped != FreeDFields.None)
@@ -110,8 +118,20 @@ public class FreeDManager : MonoBehaviour
             claimed |= r.Fields;
         }
 
-        _receivers.AddRange(FreeDReceiver.Active);
+        _receivers.AddRange(_foundReceivers);
         foreach (FreeDReceiver r in _receivers) r.Open(OnPacket);
+    }
+
+    void FindEnabledReceivers()
+    {
+        _foundReceivers.Clear();
+#if UNITY_2022_2_OR_NEWER
+        FreeDReceiver[] all = FindObjectsByType<FreeDReceiver>(FindObjectsSortMode.InstanceID);
+#else
+        FreeDReceiver[] all = FindObjectsOfType<FreeDReceiver>();
+#endif
+        foreach (FreeDReceiver r in all)
+            if (r.isActiveAndEnabled) _foundReceivers.Add(r);
     }
 
     void CloseReceivers()
@@ -127,12 +147,12 @@ public class FreeDManager : MonoBehaviour
     }
 
     /// <summary>ポート・項目・本数のどれかが変わると値が変わる。再生中の設定変更で受信をやり直す目印。</summary>
-    static int Signature()
+    int Signature()
     {
         unchecked
         {
-            int hash = FreeDReceiver.Active.Count;
-            foreach (FreeDReceiver r in FreeDReceiver.Active)
+            int hash = _foundReceivers.Count;
+            foreach (FreeDReceiver r in _foundReceivers)
                 hash = hash * 31 + r.port * 31 + (int)r.Fields;
             return hash;
         }
