@@ -1,13 +1,14 @@
 using UnityEngine;
 
 /// <summary>
-/// FreeDReceiver が受け取ったズームとフォーカスの生の値 (24bit のエンコーダ値) を、
+/// FreeDTracker が受け取ったズームとフォーカスの生の値 (24bit のエンコーダ値) を、
 /// カメラの焦点距離 (mm) とピント距離 (m) に直して反映する。
 /// 対応はレンズごとに違うので、実測した点を AnimationCurve に入れる (横軸 = 生の値)。
 /// キーのない曲線と、まだ値が届いていない項目は反映しない。
-/// カメラに付ける。親にある FreeDReceiver から値を受け取る。
+/// FreeDTracker と同じオブジェクト (カメラ) に付ける。
 /// </summary>
 [RequireComponent(typeof(Camera))]
+[RequireComponent(typeof(FreeDTracker))]
 [DisallowMultipleComponent]
 public class FreeDLens : MonoBehaviour
 {
@@ -22,26 +23,25 @@ public class FreeDLens : MonoBehaviour
     public float focusDistanceM;
 
     private Camera _camera;
-    private FreeDReceiver _receiver;
+    private FreeDTracker _tracker;
 
     void Awake()
     {
         _camera = GetComponent<Camera>();
-        _receiver = GetComponentInParent<FreeDReceiver>();
+        _tracker = GetComponent<FreeDTracker>();
     }
 
     void LateUpdate()
     {
-        if (_receiver == null) return;
-        if (_receiver.hasZoom && zoomToFocalLengthMm.length > 0)
+        if (_tracker.hasZoom && zoomToFocalLengthMm.length > 0)
         {
-            focalLengthMm = zoomToFocalLengthMm.Evaluate(_receiver.zoomRaw);
+            focalLengthMm = zoomToFocalLengthMm.Evaluate(_tracker.zoomRaw);
             _camera.usePhysicalProperties = true;
             _camera.focalLength = focalLengthMm;
         }
-        if (_receiver.hasFocus && focusToDistanceM.length > 0)
+        if (_tracker.hasFocus && focusToDistanceM.length > 0)
         {
-            focusDistanceM = focusToDistanceM.Evaluate(_receiver.focusRaw);
+            focusDistanceM = focusToDistanceM.Evaluate(_tracker.focusRaw);
 #if UNITY_2022_2_OR_NEWER
             _camera.focusDistance = focusDistanceM;
 #endif
