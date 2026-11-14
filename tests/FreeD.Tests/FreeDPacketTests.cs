@@ -3,16 +3,16 @@ using Xunit;
 
 namespace CIFER.tech.FreeD.Tests;
 
-public class FreeDMergerTests
+public class FreeDPacketTests
 {
     [Fact]
-    public void Merge_TakesEachPacketsOwnFields()
+    public void MergeFrom_TakesEachPacketsOwnFields()
     {
         var pose = new FreeDPacket { PanDegrees = 30, XMeters = 1.5, ZoomRaw = 111 };
         var lens = new FreeDPacket { PanDegrees = 99, ZoomRaw = 1000, FocusRaw = 2000 };
 
         var merged = new FreeDPacket();
-        FreeDMerger.Merge(merged, pose, FreeDField.Rotation | FreeDField.Position, lens, FreeDField.Zoom | FreeDField.Focus);
+        merged.MergeFrom(pose, FreeDField.Rotation | FreeDField.Position, lens, FreeDField.Zoom | FreeDField.Focus);
 
         Assert.Equal(30, merged.PanDegrees);
         Assert.Equal(1.5, merged.XMeters);
@@ -21,12 +21,12 @@ public class FreeDMergerTests
     }
 
     [Fact]
-    public void Merge_DoesNotCopyCameraIdAndUserData()
+    public void MergeFrom_DoesNotCopyCameraIdAndUserData()
     {
         var pose = new FreeDPacket { PanDegrees = 30, TiltDegrees = 20, RollDegrees = 10, CameraId = 2, UserData = 3 };
 
         var merged = new FreeDPacket();
-        FreeDMerger.Merge(merged, pose, FreeDField.Rotation, new FreeDPacket(), FreeDField.None);
+        merged.MergeFrom(pose, FreeDField.Rotation, new FreeDPacket(), FreeDField.None);
 
         Assert.Equal(30, merged.PanDegrees);
         Assert.Equal(20, merged.TiltDegrees);
@@ -36,35 +36,35 @@ public class FreeDMergerTests
     }
 
     [Fact]
-    public void Merge_FieldsInNeitherPacketStayDefault()
+    public void MergeFrom_FieldsInNeitherPacketStayDefault()
     {
         var a = new FreeDPacket { ZoomRaw = 5, XMeters = 5 };
 
         var merged = new FreeDPacket();
-        FreeDMerger.Merge(merged, a, FreeDField.None, a, FreeDField.None);
+        merged.MergeFrom(a, FreeDField.None, a, FreeDField.None);
 
         Assert.Equal(0u, merged.ZoomRaw);
         Assert.Equal(0, merged.XMeters);
     }
 
     [Fact]
-    public void Merge_OverlappingField_UsesSecondPacket()
+    public void MergeFrom_OverlappingField_UsesSecondPacket()
     {
         var a = new FreeDPacket { ZoomRaw = 1 };
         var b = new FreeDPacket { ZoomRaw = 2 };
 
         var merged = new FreeDPacket();
-        FreeDMerger.Merge(merged, a, FreeDField.Zoom, b, FreeDField.Zoom);
+        merged.MergeFrom(a, FreeDField.Zoom, b, FreeDField.Zoom);
 
         Assert.Equal(2u, merged.ZoomRaw);
     }
     [Fact]
-    public void CopyFields_ChangesOnlyTheGivenFields()
+    public void CopyFieldsFrom_ChangesOnlyTheGivenFields()
     {
         var destination = new FreeDPacket { PanDegrees = 1, XMeters = 2, ZoomRaw = 3, CameraId = 9 };
         var source = new FreeDPacket { PanDegrees = 10, XMeters = 20, ZoomRaw = 30, CameraId = 5 };
 
-        FreeDMerger.CopyFields(destination, source, FreeDField.Position);
+        destination.CopyFieldsFrom(source, FreeDField.Position);
 
         Assert.Equal(1, destination.PanDegrees);
         Assert.Equal(20, destination.XMeters);
