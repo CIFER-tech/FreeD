@@ -64,13 +64,13 @@ namespace CIFER.tech.FreeD.Unity
         }
 
         /// <summary>
-        /// claimedFields の項目だけを反映する。どの Receiver も担当していない項目は、届いていない値 (0) なので、反映しない。
+        /// receivedFields の項目だけを反映する。このカメラ ID で、まだ届いていない項目は値が 0 のままなので、反映しない。
         /// </summary>
-        public void Apply(in FreeDPacket packet, FreeDField claimedFields)
+        public void Apply(in FreeDPacket packet, FreeDField receivedFields)
         {
             // FreeD 座標 (X=右, Y=前, Z=上, m) での姿勢。
             // 回転は Rz(パン) · Rx(チルト) · Ry(ロール)。角度の正の向きは送信機器の仕様によるので、向きが逆なら rotationScale で反転する。
-            // 回転を担当する Receiver がないときは角度が 0 なので、単位回転になる。
+            // 回転が届いていないときは角度が 0 なので、単位回転になる。
             var freeDRotation =
                 Quaternion.AngleAxis((float)packet.PanDegrees * rotationScale.x, Vector3.forward)
                 * Quaternion.AngleAxis((float)packet.TiltDegrees * rotationScale.y, Vector3.right)
@@ -85,18 +85,18 @@ namespace CIFER.tech.FreeD.Unity
                 freeDRotation.w);
 
             // オフセットは Unity のカメラのローカル軸で適用する。
-            // 向きを担当する Receiver がないときは、今の向きから、向きのオフセットを除いたものを使う。
-            var isRotationClaimed = (claimedFields & FreeDField.Rotation) != 0;
-            var offsetRotation = isRotationClaimed
+            // 向きが届いていないときは、今の向きから、向きのオフセットを除いたものを使う。
+            var isRotationReceived = (receivedFields & FreeDField.Rotation) != 0;
+            var offsetRotation = isRotationReceived
                 ? unityRotation
                 : transform.localRotation * Quaternion.Inverse(Quaternion.Euler(rotationOffset));
 
-            if ((claimedFields & FreeDField.Position) != 0)
+            if ((receivedFields & FreeDField.Position) != 0)
             {
                 transform.localPosition = unityPosition + offsetRotation * positionOffset;
             }
 
-            if (isRotationClaimed)
+            if (isRotationReceived)
             {
                 transform.localRotation = unityRotation * Quaternion.Euler(rotationOffset);
             }
@@ -106,13 +106,13 @@ namespace CIFER.tech.FreeD.Unity
                 return;
             }
 
-            if ((claimedFields & FreeDField.Zoom) != 0 && zoomToFocalLengthMm.length > 0)
+            if ((receivedFields & FreeDField.Zoom) != 0 && zoomToFocalLengthMm.length > 0)
             {
                 camera.usePhysicalProperties = true;
                 camera.focalLength = zoomToFocalLengthMm.Evaluate(packet.ZoomRaw);
             }
 #if UNITY_2022_2_OR_NEWER
-            if ((claimedFields & FreeDField.Focus) != 0 && focusToDistanceM.length > 0)
+            if ((receivedFields & FreeDField.Focus) != 0 && focusToDistanceM.length > 0)
             {
                 camera.focusDistance = focusToDistanceM.Evaluate(packet.FocusRaw);
             }

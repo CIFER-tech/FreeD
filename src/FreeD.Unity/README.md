@@ -75,7 +75,7 @@ Model と View は、Unity の `Awake`・`OnEnable`・`Update` などを使わ�
 3. 項目ごとに、その Receiver で最後に届いた値を使う。途切れても値は保たれる。
 4. 映像とのずれは、早く届く側の Receiver の `Delay Sec` (秒) で合わせる (その分だけ反映を遅らせる)。
 5. 合成はカメラ ID ごとに行う。姿勢とレンズを 1 台のカメラにまとめるには、どちらの送信元も同じカメラ ID で送る。
-6. ズームとフォーカスの生の値 (24bit) をカメラに反映するには、`FreeDTracker` の AnimationCurve に対応を入れる (横軸 = 生の値、縦軸 = 焦点距離 mm / ピント距離 m)。初期値は、生の値の全範囲 (0 から 16777215) を 0 から 1 に写す直線なので、実際のレンズに合わせて入れ直す。キーのない曲線は反映しない。どの Receiver の `Field` にも `Zoom` がない (`Focus` も同じ) ときは、届いていない値なので、曲線があっても反映しない。位置と向きも、`Field` に `Position` や `Rotation` がなければ反映しない。焦点距離は Physical Camera に入る。ピント距離は Unity 2022.2 以降で `Camera.focusDistance` に入る。
+6. ズームとフォーカスの生の値 (24bit) をカメラに反映するには、`FreeDTracker` の AnimationCurve に対応を入れる (横軸 = 生の値、縦軸 = 焦点距離 mm / ピント距離 m)。初期値は、生の値の全範囲 (0 から 16777215) を 0 から 1 に写す直線なので、実際のレンズに合わせて入れ直す。キーのない曲線は反映しない。そのカメラ ID で、`Field` に `Zoom` を含む Receiver から、まだ何も届いていない (`Focus` も同じ) ときは、届いていない値なので、曲線があっても反映しない。位置と向きも、`Position` や `Rotation` が届くまでは反映しない。焦点距離は Physical Camera に入る。ピント距離は Unity 2022.2 以降で `Camera.focusDistance` に入る。
 
 2.0.0 より前のシーン (カメラに `FreeDReceiver` を付けていたもの) は、上の手順で組み直す。
 

@@ -12,6 +12,9 @@ namespace CIFER.tech.FreeD.Unity
         private readonly List<FreeDTracker> trackers = new();
         private readonly Dictionary<int, FreeDPacket> mergedPackets = new();
 
+        // カメラ ID ごとに、Receiver から届いたことのある項目。
+        private readonly Dictionary<int, FreeDField> receivedFieldsByCameraId = new();
+
         private void OnEnable()
         {
 #if UNITY_6000_5_OR_NEWER
@@ -50,6 +53,7 @@ namespace CIFER.tech.FreeD.Unity
             }
 
             mergedPackets.Clear();
+            receivedFieldsByCameraId.Clear();
             receivers.Clear();
             trackers.Clear();
         }
@@ -58,7 +62,7 @@ namespace CIFER.tech.FreeD.Unity
         {
             CloseDestroyedReceivers();
 
-            if (HasOverlappedField(out var claimedFields))
+            if (HasOverlappedField())
             {
                 return;
             }
@@ -74,6 +78,9 @@ namespace CIFER.tech.FreeD.Unity
                     // この Receiver の担当項目だけを新しい値にし、残りは今までの値を保つ。
                     mergedPackets[cameraId] =
                         FreeDMerger.Merge(mergedPacket, ~receiver.Field, packet.packet, receiver.Field);
+
+                    receivedFieldsByCameraId.TryGetValue(cameraId, out var receivedFields);
+                    receivedFieldsByCameraId[cameraId] = receivedFields | receiver.Field;
                 }
             }
 
@@ -86,7 +93,8 @@ namespace CIFER.tech.FreeD.Unity
 
                 if (mergedPackets.TryGetValue(tracker.CameraId, out var mergedPacket))
                 {
-                    tracker.Apply(mergedPacket, claimedFields);
+                    receivedFieldsByCameraId.TryGetValue(tracker.CameraId, out var receivedFields);
+                    tracker.Apply(mergedPacket, receivedFields);
                 }
             }
         }
@@ -107,13 +115,10 @@ namespace CIFER.tech.FreeD.Unity
             }
         }
 
-        /// <summary>
-        /// 同じ項目を 2 つのストリームが担当すると合成できないので、重なっていないかを調べる。
-        /// claimedFields は、いずれかの Receiver が担当している項目。
-        /// </summary>
-        private bool HasOverlappedField(out FreeDField claimedFields)
+        /// <summary>同じ項目を 2 つのストリームが担当すると合成できないので、重なっていないかを調べる。</summary>
+        private bool HasOverlappedField()
         {
-            claimedFields = FreeDField.None;
+            var claimedFields = FreeDField.None;
             var isOverlapped = false;
 
             foreach (var receiver in receivers)
