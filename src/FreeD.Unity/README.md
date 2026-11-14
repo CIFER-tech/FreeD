@@ -34,7 +34,7 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 
 ## 必要なパッケージ
 
-受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) (4.0.0 以降。ビルドした DLL を同梱している) を使う。`Packages/manifest.json` の `dependencies` に足しておく (FreeD と同じ置き方なら、次のとおり)。
+受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) (4.0.1 以降。ビルドした DLL を同梱している) を使う。`Packages/manifest.json` の `dependencies` に足しておく (FreeD と同じ置き方なら、次のとおり)。
 
 ```json
 "tech.cifer.ringbuffer": "file:../../../RingBuffer/src/RingBuffer.Unity"
