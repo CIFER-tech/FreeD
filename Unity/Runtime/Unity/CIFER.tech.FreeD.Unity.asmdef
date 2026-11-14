@@ -1,0 +1,16 @@
+{
+    "name": "CIFER.tech.FreeD.Unity",
+    "rootNamespace": "CIFER.tech.FreeD.Unity",
+    "references": [
+        "CIFER.tech.FreeD.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

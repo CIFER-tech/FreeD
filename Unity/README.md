@@ -1,7 +1,6 @@
 # FreeD (Unity Package)
 
-FreeD (D1, 29 バイト) メッセージの符号化・復号ライブラリ。[`src/FreeD`](../src/FreeD) をビルドした
-netstandard2.1 の DLL を同梱している (Unity 2021.2+ 向け)。
+FreeD (D1, 29 バイト) メッセージの符号化・復号と、Unity での受信・反映のためのパッケージ (Unity 2021.2+ 向け)。
 
 ## インストール
 
@@ -16,7 +15,7 @@ https://github.com/<owner>/FreeD.git?path=Unity
 ## 使い方
 
 ```csharp
-using FreeD;
+using CIFER.tech.FreeD.Core;
 
 var packet = new FreeDPacket
 {
@@ -33,40 +32,58 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 
 詳しいメッセージ配置・仕様の注意点はリポジトリ直下の [README](../README.md) を参照。
 
-## 受信コンポーネント (FreeDReceiver)
+## 必要なパッケージ
 
-Unity のカメラ (または任意のオブジェクト) に `FreeDReceiver` を付けるだけで、UDP で受信したFreeDが位置・向きに反映される。
+受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) を使う。`Packages/manifest.json` の `dependencies` に足しておく (FreeD と同じ置き方なら、次のとおり)。
 
-1. パッケージを入れ、カメラに `FreeDReceiver` を追加する。
-2. `Streams` の 1 本目の `Port` を retroloc の「FreeD送信」のポート (既定 40000) に合わせる。
-3. 再生すると、左上に受信状態・位置 (mm)・角度 (°) が出る。
-4. 向きが逆なら `panSign` / `tiltSign` / `rollSign` を -1 にする。カメラ取り付けのずれは `positionOffset` / `rotationOffset` で合わせる (どちらも Unity の座標・向きで指定。カメラのローカル軸: 右・上・前、回転は Transform の Rotation と同じ)。
+```json
+"tech.cifer.ringbuffer": "file:../../../RingBuffer/Unity"
+```
 
-座標は retroloc のワールド (X=右, Y=前, Z=上, m) から Unity へ `(x, y, z) → (x, z, y)` で変換する。
+## 受信コンポーネント (FreeDManager・FreeDReceiverForUnity・FreeDTracker)
 
-### 複数のストリームを合成する (姿勢 + レンズ)
+3 つのコンポーネントに分かれている。
 
-姿勢は retroloc、ズームとフォーカスは別のシステム、のように別々の FreeD ストリームで届くときは、`Streams` にストリームを足して、ポートごとに使う項目を選ぶ。
+- `FreeDManager`: シーンに 1 つ置く。受信の開始・停止と、カメラ ID ごとの合成をすべて管理する。シーンになければ、受信も反映も行われない。再生を始めたときに無効な `FreeDReceiverForUnity` は、対象にならない (控えの Receiver は無効にして置く)。
+- `FreeDReceiverForUnity`: ポート 1 つで受信するだけ (受信そのものは Core の `FreeDReceiver` が行う)。送信元のポートごとに 1 つ置く。
+- `FreeDTracker`: カメラ ID を指定して値を受け取り、自分のオブジェクトの位置・向きに反映する。親のオブジェクトが FreeD 座標の原点になる。
 
-1. `Streams` を 2 本にする。1 本目: `Port` 40000、`Rotation` と `Position` だけチェック。2 本目: `Port` 41000、`Zoom` と `Focus` だけチェック。
-2. 同じ項目は 1 つのストリームだけが使える。チェックすると、他のストリームのチェックが外れる。
-3. 項目ごとに、そのストリームで最後に届いた値を使う。途切れても値は保たれ、左上の表示でそのストリームが「途切れ」になる。
-4. 映像とのずれは、早く届く側のストリームの `Delay Ms` で合わせる (その分だけ反映を遅らせる)。
-5. ズームとフォーカスの生の値 (24bit) は `zoomRaw` / `focusRaw` に出る。カメラに反映するには、同じオブジェクトに `FreeDLens` を付け、AnimationCurve に対応を入れる (横軸 = 生の値、縦軸 = 焦点距離 mm / ピント距離 m)。焦点距離は Physical Camera に入る。ピント距離は Unity 2022.2 以降で `Camera.focusDistance` にも入り、`FreeDLens.focusDistanceM` からも読める。
+1. パッケージを入れ、空のオブジェクトに `FreeDManager` を追加する。
+2. 空のオブジェクト (Manager の子でもよい) に `FreeDReceiverForUnity` を追加し、`Port` を送信側のポート (既定 40000) に合わせる。
+3. 空のオブジェクトを 1 つ作り、FreeD 座標の原点にあたる Unity 上の場所と向きに合わせる (Position と Rotation の Y)。Scene ビューの青い矢印 = FreeD の Y、赤い矢印 = X。床は水平とみなすので、Rotation の X・Z は 0 にする。
+4. その子に Unity のカメラを置き、`FreeDTracker` を追加する。`Camera Id` を送信側のカメラ ID に合わせ、`Camera` の欄にそのカメラを割り当てる。`Camera` の欄が空だと、ズームとフォーカスは反映されない (位置と向きは反映される)。
+5. 再生すると、カメラが受信した位置・向きに動く。向きが逆なら、`Rotation Scale` の該当する軸 (X=パン, Y=チルト, Z=ロール) を -1 にする。位置が逆なら、`Position Scale` の該当する軸 (X=右, Y=前, Z=上) を -1 にする。カメラ取り付けのずれは `Position Offset` / `Rotation Offset` で合わせる (どちらも Unity の座標・向きで指定。カメラのローカル軸: 右・上・前、回転は Transform の Rotation と同じ)。
 
-1.2 までのシーンの `port` / `cameraId` は、読み込むと `Streams` の 1 本目に移る。
+座標は FreeD 座標 (X=右, Y=前, Z=上, m) から Unity へ `(x, y, z) → (x, z, y)` で変換する。
 
-## DLL の更新について
+### 設計 (MVP)
 
-このフォルダの `Runtime/FreeD.dll` は `src/FreeD` のビルド出力をそのまま同梱したもの。
-`src/FreeD/**` を変更して `main` にpushすると、
-[`.github/workflows/sync-unity-dll.yml`](../.github/workflows/sync-unity-dll.yml) が自動的に
-Release ビルドして `Runtime/FreeD.dll` / `Runtime/FreeD.pdb` を差分コミットする。
+| 役割 | コンポーネント | 持つもの |
+| --- | --- | --- |
+| Model | `FreeDReceiverForUnity` | ポートで受信した値。ほかを知らない |
+| View | `FreeDTracker` | 受け取った値の表示 (カメラの位置・向き・レンズ)。ほかを知らない |
+| Presenter | `FreeDManager` | Model と View の寿命、毎フレームの取り出し・合成・反映 |
 
-手元で確認したい場合は以下を実行する。
+Model と View は、Unity の `Awake`・`OnEnable`・`Update` などを使わない。動かすのは Presenter だけで、Model と View は互いを参照しない。
+
+### 複数のポートを合成する (姿勢 + レンズ)
+
+姿勢とレンズ (ズーム・フォーカス) が別々のポートで届くときは、`FreeDReceiverForUnity` をポートごとに置き、使う項目を選ぶ。
+
+1. `FreeDReceiverForUnity` を 2 つ置く。1 つ目: `Port` 40000、`Field` で `Position` と `Rotation` だけ選ぶ。2 つ目: `Port` 41000、`Field` で `Zoom` と `Focus` だけ選ぶ。
+2. 同じ項目は 1 つの Receiver だけが使える。重なっていると、Manager がエラーを出して、反映を行わない。
+3. 項目ごとに、その Receiver で最後に届いた値を使う。途切れても値は保たれる。
+4. 映像とのずれは、早く届く側の Receiver の `Delay Sec` (秒) で合わせる (その分だけ反映を遅らせる)。
+5. 合成はカメラ ID ごとに行う。姿勢とレンズを 1 台のカメラにまとめるには、どちらの送信元も同じカメラ ID で送る。
+6. ズームとフォーカスの生の値 (24bit) をカメラに反映するには、`FreeDTracker` の AnimationCurve に対応を入れる (横軸 = 生の値、縦軸 = 焦点距離 mm / ピント距離 m)。初期値は、生の値の全範囲 (0 から 16777215) を 0 から 1 に写す直線なので、実際のレンズに合わせて入れ直す。キーのない曲線は反映しない。焦点距離は Physical Camera に入る。ピント距離は Unity 2022.2 以降で `Camera.focusDistance` に入る。
+
+2.0.0 より前のシーン (カメラに `FreeDReceiver` を付けていたもの) は、上の手順で組み直す。
+
+## ソースの置き場所について
+
+符号化・復号・合成のソースは `Runtime/Core/` にあり、Unity では Unity に依存しないアセンブリ `CIFER.tech.FreeD.Core` としてコンパイルされる (DLL は同梱しない)。コンポーネントは `Runtime/Unity/` にあり、アセンブリ `CIFER.tech.FreeD.Unity` が Core を参照する。
+`src/FreeD/FreeD.csproj` は同じソースを取り込んで、.NET のアプリとテストから使えるようにしている。
 
 ```
-dotnet build src/FreeD/FreeD.csproj -c Release
-cp src/FreeD/bin/Release/netstandard2.1/FreeD.dll Unity/Runtime/FreeD.dll
-cp src/FreeD/bin/Release/netstandard2.1/FreeD.pdb Unity/Runtime/FreeD.pdb
+dotnet test
 ```

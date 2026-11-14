@@ -1,31 +1,18 @@
+using CIFER.tech.FreeD.Core;
 using Xunit;
 
 namespace FreeD.Tests;
 
 public class FreeDMergerTests
 {
-    private const int PoseStream = 0;
-    private const int LensStream = 1;
-
-    private static FreeDMerger PoseAndLens() => new FreeDMerger(new[]
-    {
-        FreeDFields.Rotation | FreeDFields.Position,
-        FreeDFields.Zoom | FreeDFields.Focus,
-    });
-
-    private static FreeDPacket Pose(double pan, double xMeters) => new FreeDPacket { PanDegrees = pan, XMeters = xMeters };
-    private static FreeDPacket Lens(uint zoom, uint focus) => new FreeDPacket { ZoomRaw = zoom, FocusRaw = focus };
-
     [Fact]
-    public void Update_CombinesPoseAndLensIntoOnePacket()
+    public void Merge_TakesEachPacketsOwnFields()
     {
-        var merger = PoseAndLens();
-        merger.Put(PoseStream, Pose(pan: 30, xMeters: 1.5), receivedMs: 0);
-        merger.Put(LensStream, Lens(zoom: 1000, focus: 2000), receivedMs: 0);
+        var pose = new FreeDPacket { PanDegrees = 30, XMeters = 1.5, ZoomRaw = 111 };
+        var lens = new FreeDPacket { PanDegrees = 99, ZoomRaw = 1000, FocusRaw = 2000 };
 
-        var filled = merger.Update(nowMs: 0, out FreeDPacket merged);
+        var merged = FreeDMerger.Merge(pose, FreeDField.Rotation | FreeDField.Position, lens, FreeDField.Zoom | FreeDField.Focus);
 
-        Assert.Equal(FreeDFields.Rotation | FreeDFields.Position | FreeDFields.Zoom | FreeDFields.Focus, filled);
         Assert.Equal(30, merged.PanDegrees);
         Assert.Equal(1.5, merged.XMeters);
         Assert.Equal(1000u, merged.ZoomRaw);
@@ -33,53 +20,38 @@ public class FreeDMergerTests
     }
 
     [Fact]
-    public void Constructor_RejectsFieldClaimedByTwoStreams()
+    public void Merge_DoesNotCopyCameraIdAndUserData()
     {
-        var overlapping = new[] { FreeDFields.Rotation | FreeDFields.Zoom, FreeDFields.Zoom };
+        var pose = new FreeDPacket { PanDegrees = 30, TiltDegrees = 20, RollDegrees = 10, CameraId = 2, UserData = 3 };
 
-        Assert.Throws<ArgumentException>(() => new FreeDMerger(overlapping));
+        var merged = FreeDMerger.Merge(pose, FreeDField.Rotation, new FreeDPacket(), FreeDField.None);
+
+        Assert.Equal(30, merged.PanDegrees);
+        Assert.Equal(20, merged.TiltDegrees);
+        Assert.Equal(10, merged.RollDegrees);
+        Assert.Equal(0, merged.CameraId);
+        Assert.Equal(0, merged.UserData);
     }
 
     [Fact]
-    public void Update_KeepsLastValueAfterStreamStops()
+    public void Merge_FieldsInNeitherPacketStayDefault()
     {
-        var merger = PoseAndLens();
-        merger.Put(PoseStream, Pose(pan: 10, xMeters: 0), receivedMs: 0);
-        merger.Put(LensStream, Lens(zoom: 500, focus: 0), receivedMs: 0);
-        merger.Update(nowMs: 0, out _);
+        var a = new FreeDPacket { ZoomRaw = 5, XMeters = 5 };
 
-        merger.Put(PoseStream, Pose(pan: 20, xMeters: 0), receivedMs: 1000); // レンズだけ止まる
-        merger.Update(nowMs: 1000, out FreeDPacket merged);
+        var merged = FreeDMerger.Merge(a, FreeDField.None, a, FreeDField.None);
 
-        Assert.Equal(20, merged.PanDegrees);
-        Assert.Equal(500u, merged.ZoomRaw);
-        Assert.True(merger.IsReceiving(PoseStream, nowMs: 1000));
-        Assert.False(merger.IsReceiving(LensStream, nowMs: 1000));
+        Assert.Equal(0u, merged.ZoomRaw);
+        Assert.Equal(0, merged.XMeters);
     }
 
     [Fact]
-    public void Update_HoldsPacketUntilItsDelayHasPassed()
+    public void Merge_OverlappingField_UsesSecondPacket()
     {
-        var merger = PoseAndLens();
-        merger.SetDelay(PoseStream, 50);
-        merger.Put(PoseStream, Pose(pan: 45, xMeters: 0), receivedMs: 100);
+        var a = new FreeDPacket { ZoomRaw = 1 };
+        var b = new FreeDPacket { ZoomRaw = 2 };
 
-        var filledBeforeDelay = merger.Update(nowMs: 149, out _);
-        var filledAfterDelay = merger.Update(nowMs: 150, out FreeDPacket merged);
+        var merged = FreeDMerger.Merge(a, FreeDField.Zoom, b, FreeDField.Zoom);
 
-        Assert.Equal(FreeDFields.None, filledBeforeDelay);
-        Assert.Equal(FreeDFields.Rotation | FreeDFields.Position, filledAfterDelay);
-        Assert.Equal(45, merged.PanDegrees);
-    }
-
-    [Fact]
-    public void Update_ReportsOnlyFieldsThatHaveReceivedAValue()
-    {
-        var merger = PoseAndLens();
-        merger.Put(LensStream, Lens(zoom: 1, focus: 2), receivedMs: 0);
-
-        var filled = merger.Update(nowMs: 0, out _);
-
-        Assert.Equal(FreeDFields.Zoom | FreeDFields.Focus, filled);
+        Assert.Equal(2u, merged.ZoomRaw);
     }
 }

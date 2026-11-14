@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- netstandard2.1: .NET 8 のアプリからも、Unity (2021.2+) の Plugins/ に置いた DLL からも使える -->
+  <!-- ソースは Unity パッケージ (Unity/Runtime/Core) に置き、Unity と .NET のアプリで同じソースを使う。DLL は作って同梱しない -->
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <RootNamespace>FreeD</RootNamespace>
@@ -8,6 +8,16 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <Deterministic>true</Deterministic>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Unity\Runtime\Core\**\*.cs" />
+  </ItemGroup>
+
+  <!-- FreeDReceiver が使う。RingBuffer のリポジトリを、このリポジトリの隣に置く -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\RingBuffer\src\RingBuffer\RingBuffer.csproj" />
+  </ItemGroup>
 
 </Project>

@@ -1,6 +1,6 @@
 using System;
 
-namespace FreeD
+namespace CIFER.tech.FreeD.Core
 {
     /// <summary>
     /// FreeD D1 メッセージ (29 バイト) の符号化・復号。
@@ -18,7 +18,6 @@ namespace FreeD
     /// [26..27] ユーザーデータ 16bit
     /// [28]     チェックサム = (0x40 - Σ[0..27]) mod 256
     /// </code>
-    /// 配置は Vizrt Tracking Hub の設定例と OSS 実装の2系統で一致を確認した。
     /// 公式の仕様書原本は未確認なので、受信機側の軸の向き・符号は実機で確認すること
     /// (受信機に合わせた符号の反転は、呼び出し側で行う)。
     /// </summary>
@@ -27,17 +26,28 @@ namespace FreeD
         public const int PacketLength = 29;
         public const byte MessageTypeD1 = 0xD1;
 
-        private const double AngleScale = 32768.0;          // 1/32768 度
-        private const double PositionScale = 64.0 * 1000.0; // 1/64 mm → m あたり 64000
-        private const int Signed24Min = -8388608;
-        private const int Signed24Max = 8388607;
-        private const uint Unsigned24Max = 0xFFFFFF;
+        /// <summary>角度 1 度あたりの生の値 (1/32768 度単位)。</summary>
+        public const double AngleScale = 32768.0;
+
+        /// <summary>位置 1 m あたりの生の値 (1/64 mm 単位なので 64000)。</summary>
+        public const double PositionScale = 64.0 * 1000.0;
+
+        /// <summary>角度・位置の生の値の最小 (24bit 符号付き)。</summary>
+        public const int Signed24Min = -8388608;
+
+        /// <summary>角度・位置の生の値の最大 (24bit 符号付き)。</summary>
+        public const int Signed24Max = 8388607;
+
+        /// <summary>ズーム・フォーカスの生の値の最大 (24bit 符号なし)。</summary>
+        public const uint Unsigned24Max = 0xFFFFFF;
 
         /// <summary>29 バイトを書き込み、書き込んだバイト数を返す。値は 24bit の範囲に飽和させる。</summary>
         public static int Encode(in FreeDPacket p, Span<byte> destination)
         {
             if (destination.Length < PacketLength)
+            {
                 throw new ArgumentException($"destination must be at least {PacketLength} bytes.", nameof(destination));
+            }
 
             destination[0] = MessageTypeD1;
             destination[1] = p.CameraId;
@@ -59,9 +69,20 @@ namespace FreeD
         public static bool TryDecode(ReadOnlySpan<byte> source, out FreeDPacket packet)
         {
             packet = default;
-            if (source.Length < PacketLength) return false;
-            if (source[0] != MessageTypeD1) return false;
-            if (source[PacketLength - 1] != Checksum(source.Slice(0, PacketLength - 1))) return false;
+            if (source.Length < PacketLength)
+            {
+                return false;
+            }
+
+            if (source[0] != MessageTypeD1)
+            {
+                return false;
+            }
+
+            if (source[PacketLength - 1] != Checksum(source.Slice(0, PacketLength - 1)))
+            {
+                return false;
+            }
 
             packet.CameraId = source[1];
             packet.PanDegrees = ReadSigned24(source, 2) / AngleScale;
@@ -79,17 +100,33 @@ namespace FreeD
         /// <summary>先頭 28 バイトからチェックサムを求める: (0x40 − 総和) mod 256。</summary>
         public static byte Checksum(ReadOnlySpan<byte> bytesBeforeChecksum)
         {
-            int sum = 0;
-            for (int i = 0; i < bytesBeforeChecksum.Length; i++) sum += bytesBeforeChecksum[i];
+            var sum = 0;
+            for (var i = 0; i < bytesBeforeChecksum.Length; i++)
+            {
+                sum += bytesBeforeChecksum[i];
+            }
+
             return (byte)((0x40 - sum) & 0xFF);
         }
 
         private static int ToRaw(double value, double scale)
         {
-            double raw = Math.Round(value * scale, MidpointRounding.AwayFromZero);
-            if (double.IsNaN(raw)) return 0;
-            if (raw < Signed24Min) return Signed24Min;
-            if (raw > Signed24Max) return Signed24Max;
+            var raw = Math.Round(value * scale, MidpointRounding.AwayFromZero);
+            if (double.IsNaN(raw))
+            {
+                return 0;
+            }
+
+            if (raw < Signed24Min)
+            {
+                return Signed24Min;
+            }
+
+            if (raw > Signed24Max)
+            {
+                return Signed24Max;
+            }
+
             return (int)raw;
         }
 
@@ -102,7 +139,11 @@ namespace FreeD
 
         private static void WriteUnsigned24(Span<byte> d, int offset, uint value)
         {
-            if (value > Unsigned24Max) value = Unsigned24Max;
+            if (value > Unsigned24Max)
+            {
+                value = Unsigned24Max;
+            }
+
             d[offset] = (byte)((value >> 16) & 0xFF);
             d[offset + 1] = (byte)((value >> 8) & 0xFF);
             d[offset + 2] = (byte)(value & 0xFF);
@@ -110,7 +151,7 @@ namespace FreeD
 
         private static int ReadSigned24(ReadOnlySpan<byte> s, int offset)
         {
-            int v = (s[offset] << 16) | (s[offset + 1] << 8) | s[offset + 2];
+            var v = (s[offset] << 16) | (s[offset + 1] << 8) | s[offset + 2];
             return v >= 0x800000 ? v - 0x1000000 : v;
         }
 

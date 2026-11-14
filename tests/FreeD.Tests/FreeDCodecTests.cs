@@ -1,8 +1,9 @@
+using CIFER.tech.FreeD.Core;
 using Xunit;
 
 namespace FreeD.Tests;
 
-public class FreeDTests
+public class FreeDCodecTests
 {
     // 手計算で求めた期待値 (実装とは独立に作ったバイト列)。
     //   pan=90° → 90*32768=2949120=0x2D0000          tilt=-45° → -1474560 → 0xE98000     roll=0
