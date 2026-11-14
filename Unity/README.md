@@ -45,7 +45,7 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 2. 空のオブジェクト (Manager の子でもよい) に `FreeDReceiver` を追加し、`Port` を retroloc の「FreeD送信」のポート (既定 40000) に合わせる。
 3. 空のオブジェクトを 1 つ作り、retroloc の原点にあたる Unity 上の場所と向きに合わせる (Position と Rotation の Y)。Scene ビューの青い矢印 = retroloc の Y、赤い矢印 = X。床は水平とみなすので、Rotation の X・Z は 0 にする。
 4. その子に Unity のカメラを置き、`FreeDTracker` を追加する。`Camera Id` を送信側のカメラ ID (retroloc は既定 1) に合わせる。
-5. 再生すると、Manager・Receiver・Tracker の Inspector に受信状態・位置 (mm)・角度 (°) が出る。
+5. 再生すると、Manager の Inspector にポートごと・カメラ ID ごとの受信状態が、Tracker の Inspector に位置 (mm)・角度 (°) が出る。
 6. 向きが逆なら、`Rotation Scale` の該当する軸 (X=パン, Y=チルト, Z=ロール) を -1 にする。カメラ取り付けのずれは `Position Offset` / `Rotation Offset` で合わせる (どちらも Unity の座標・向きで指定。カメラのローカル軸: 右・上・前、回転は Transform の Rotation と同じ)。
 
 座標は retroloc のワールド (X=右, Y=前, Z=上, m) から Unity へ `(x, y, z) → (x, z, y)` で変換する。
@@ -55,8 +55,8 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 姿勢は retroloc、ズームとフォーカスは別のシステム、のように別々のポートで届くときは、`FreeDReceiver` をポートごとに置き、使う項目を選ぶ。
 
 1. `FreeDReceiver` を 2 つ置く。1 つ目: `Port` 40000、`Fields` で `Position` と `Rotation` だけ選ぶ。2 つ目: `Port` 41000、`Fields` で `Zoom` と `Focus` だけ選ぶ。
-2. 同じ項目は 1 つの Receiver だけが使える。選ぶと、他の Receiver の選択が外れる。
-3. 項目ごとに、その Receiver で最後に届いた値を使う。途切れても値は保たれ、Receiver の `Receiving` が false になる。
+2. 同じ項目は 1 つの Receiver だけが使える。重なっていると、Manager がエラーを出して、受信を始めない。
+3. 項目ごとに、その Receiver で最後に届いた値を使う。途切れても値は保たれ、Manager の状態で、そのポートが `lost` になる。
 4. 映像とのずれは、早く届く側の Receiver の `Delay Ms` で合わせる (その分だけ反映を遅らせる)。
 5. 合成はカメラ ID ごとに行う。姿勢とレンズを 1 台のカメラにまとめるには、どちらのシステムも同じカメラ ID で送る。
 6. ズームとフォーカスの生の値 (24bit) は `FreeDTracker` の `zoomRaw` / `focusRaw` に出る。カメラに反映するには、Tracker と同じオブジェクトに `FreeDLens` を付け、AnimationCurve に対応を入れる (横軸 = 生の値、縦軸 = 焦点距離 mm / ピント距離 m)。焦点距離は Physical Camera に入る。ピント距離は Unity 2022.2 以降で `Camera.focusDistance` にも入り、`FreeDLens.focusDistanceM` からも読める。
