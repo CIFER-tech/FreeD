@@ -32,7 +32,7 @@ public class FreeDManager : MonoBehaviour
         [Tooltip("直近1秒の受信間隔 (ms)")]
         public float meanIntervalMs, maxIntervalMs;
 
-        // 受信スレッドが書き、Update が読む。FreeDManager の _lock で守る。
+        // 受信タスクが書き、Update が読む。FreeDManager の _lock で守る。
         [System.NonSerialized] private int _count;
         [System.NonSerialized] private double _sumIntervalMs, _maxIntervalMsSoFar, _lastReceivedMs = double.NegativeInfinity;
 
@@ -206,7 +206,7 @@ public class FreeDManager : MonoBehaviour
         }
     }
 
-    /// <summary>受信スレッドから呼ばれる。</summary>
+    /// <summary>受信タスク (スレッドプール) から呼ばれる。</summary>
     void OnPacket(FreeDReceiver receiver, FreeDPacket packet)
     {
         double nowMs = _stopwatch.Elapsed.TotalMilliseconds;

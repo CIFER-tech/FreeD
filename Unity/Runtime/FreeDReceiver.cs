@@ -1,7 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading;
+using System.Threading.Tasks;
 using FreeD;
 using UnityEngine;
 
@@ -27,7 +27,7 @@ public class FreeDReceiver : MonoBehaviour
     public float delayMs = 0f;
 
     private UdpClient _udp;
-    private Thread _thread;
+    private Task _receiveTask;
     private volatile bool _isRunning;
 
     public FreeDFields Fields
@@ -45,13 +45,12 @@ public class FreeDReceiver : MonoBehaviour
         if (FreeDManager.Instance != null) FreeDManager.Instance.MarkReceiversChanged();
     }
 
-    /// <summary>FreeDManager が呼ぶ。受信を始め、パケットが届くたびに onPacket を受信スレッドから呼ぶ。</summary>
+    /// <summary>FreeDManager が呼ぶ。受信を始め、パケットが届くたびに onPacket を受信タスク (スレッドプール) から呼ぶ。</summary>
     internal void Open(Action<FreeDReceiver, FreeDPacket> onPacket)
     {
         try
         {
             _udp = new UdpClient(new IPEndPoint(IPAddress.Any, port));
-            _udp.Client.ReceiveTimeout = 200;
         }
         catch (Exception e)
         {
@@ -61,32 +60,32 @@ public class FreeDReceiver : MonoBehaviour
         }
         _isRunning = true;
         UdpClient udp = _udp;
-        _thread = new Thread(() => Loop(udp, onPacket)) { IsBackground = true, Name = "FreeDReceiver " + port };
-        _thread.Start();
+        _receiveTask = Task.Run(() => ReceiveLoopAsync(udp, onPacket));
     }
 
     /// <summary>FreeDManager が呼ぶ。受信を止めてポートを閉じる。</summary>
     internal void Close()
     {
         _isRunning = false;
+        // 受信待ちを終わらせるには、ソケットを閉じる (UdpClient.ReceiveAsync はキャンセルできない)
         if (_udp != null) { try { _udp.Close(); } catch { } }
-        if (_thread != null) _thread.Join(500);
+        if (_receiveTask != null) { try { _receiveTask.Wait(500); } catch { } }
         _udp = null;
-        _thread = null;
+        _receiveTask = null;
     }
 
-    void Loop(UdpClient udp, Action<FreeDReceiver, FreeDPacket> onPacket)
+    async Task ReceiveLoopAsync(UdpClient udp, Action<FreeDReceiver, FreeDPacket> onPacket)
     {
-        var any = new IPEndPoint(IPAddress.Any, 0);
         while (_isRunning)
         {
+            UdpReceiveResult result;
             try
             {
-                byte[] data = udp.Receive(ref any);
-                if (FreeDCodec.TryDecode(data, out FreeDPacket p)) onPacket(this, p);
+                result = await udp.ReceiveAsync();
             }
-            catch (SocketException) { }
             catch (ObjectDisposedException) { return; }
+            catch (SocketException) { continue; }
+            if (FreeDCodec.TryDecode(result.Buffer, out FreeDPacket p)) onPacket(this, p);
         }
     }
 }
