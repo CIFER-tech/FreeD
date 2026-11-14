@@ -5,7 +5,7 @@ using UnityEngine;
 /// <summary>
 /// FreeD 受信を管理する。シーンに 1 つ置く。
 /// 有効な FreeDReceiver の受信を開始・停止し、毎フレーム各 Receiver のパケットを取りに行って、カメラ ID ごとに FreeDMerger で合成して、
-/// FreeDTracker に渡す。受信の状態 (pkt/s・間隔・途切れ) も集計する。
+/// FreeDTracker に渡す。
 /// FreeDManager がなければ、受信も反映も行われない。
 /// </summary>
 [DefaultExecutionOrder(-100)]
@@ -26,8 +26,6 @@ public class FreeDManager : MonoBehaviour
     private readonly Dictionary<int, FreeDMergedCamera> _mergedByCameraId = new Dictionary<int, FreeDMergedCamera>();
     // シーンから見つけた有効な Receiver。項目の重なりなどで開けなかったものも含む。
     private readonly List<FreeDReceiver> _foundReceivers = new List<FreeDReceiver>();
-    // このフレームに Receiver から取り出したパケット。毎フレーム空にして使い回す。
-    private readonly List<FreeDPolledPacket> _polledPackets = new List<FreeDPolledPacket>();
     private bool _isReceiverSetChanged;
     private int _openedSignature;
 
@@ -53,18 +51,22 @@ public class FreeDManager : MonoBehaviour
 
     private void Update()
     {
-        if (IsRestartNeeded())
+        if (_isReceiverSetChanged || Signature() != _openedSignature)
         {
             StopReceiving();
             StartReceiving();
         }
 
-        double nowMs = FreeDClock.NowMs;
         PollReceivers();
-        PutPolledPacketsToMergers();
-        MergeAll(nowMs);
-        UpdateReceiverSummary();
-        UpdateCameraStatus();
+        MergeAll(FreeDClock.NowMs);
+
+        receiving = false;
+        totalPacketsPerSecond = 0;
+        foreach (FreeDReceiver receiver in _openedReceivers)
+        {
+            receiving |= receiver.status.isReceiving;
+            totalPacketsPerSecond += receiver.status.packetsPerSecond;
+        }
     }
 
     /// <summary>カメラ ID のデータを合成した値を取る。その ID のパケットがまだ 1 つも届いていないときは false。</summary>
@@ -90,8 +92,6 @@ public class FreeDManager : MonoBehaviour
         _isReceiverSetChanged = true;
     }
 
-    // ---- 開始・停止 ----
-
     private void StartReceiving()
     {
         _isReceiverSetChanged = false;
@@ -104,42 +104,24 @@ public class FreeDManager : MonoBehaviour
 
         foreach (FreeDReceiver receiver in _foundReceivers)
         {
-            OpenReceiver(receiver);
+            _openedReceivers.Add(receiver);
+            receiver.Open();
         }
     }
 
     private void StopReceiving()
-    {
-        CloseReceivers();
-        ClearState();
-    }
-
-    private void OpenReceiver(FreeDReceiver receiver)
-    {
-        _openedReceivers.Add(receiver);
-        receiver.Open();
-    }
-
-    private void CloseReceivers()
     {
         foreach (FreeDReceiver receiver in _openedReceivers)
         {
             receiver.Close();
         }
         _openedReceivers.Clear();
-    }
-
-    private void ClearState()
-    {
-        _polledPackets.Clear();
         _mergersByCameraId.Clear();
         _mergedByCameraId.Clear();
         cameras.Clear();
         receiving = false;
         totalPacketsPerSecond = 0;
     }
-
-    // ---- 受信する Receiver の決定 ----
 
     private void FindEnabledReceivers()
     {
@@ -175,11 +157,6 @@ public class FreeDManager : MonoBehaviour
         return false;
     }
 
-    private bool IsRestartNeeded()
-    {
-        return _isReceiverSetChanged || Signature() != _openedSignature;
-    }
-
     /// <summary>ポート・項目・本数のどれかが変わると値が変わる。再生中の設定変更で受信をやり直す目印。</summary>
     private int Signature()
     {
@@ -194,114 +171,51 @@ public class FreeDManager : MonoBehaviour
         }
     }
 
-    // ---- 毎フレームの処理 ----
-
-    /// <summary>各 Receiver が保持しているパケットを、届いた順にすべて取り出す。取り出すだけで、中身は使わない。</summary>
+    /// <summary>各 Receiver が保持しているパケットを、届いた順にすべて取り出して、カメラ ID ごとの Merger に渡す。</summary>
     private void PollReceivers()
     {
-        _polledPackets.Clear();
         for (int receiverIndex = 0; receiverIndex < _openedReceivers.Count; receiverIndex++)
         {
             while (_openedReceivers[receiverIndex].TryDequeue(out FreeDReceivedPacket received))
             {
-                _polledPackets.Add(new FreeDPolledPacket { receiverIndex = receiverIndex, received = received });
+                int cameraId = received.packet.CameraId;
+                if (!_mergersByCameraId.TryGetValue(cameraId, out FreeDMerger merger))
+                {
+                    var fields = new List<FreeDFields>();
+                    foreach (FreeDReceiver receiver in _openedReceivers)
+                    {
+                        fields.Add(receiver.Fields);
+                    }
+                    merger = new FreeDMerger(fields);
+                    _mergersByCameraId[cameraId] = merger;
+                }
+                merger.Put(receiverIndex, received.packet, received.receivedMs);
             }
         }
     }
 
-    /// <summary>取り出したパケットを、カメラ ID ごとの Merger に渡す。</summary>
-    private void PutPolledPacketsToMergers()
-    {
-        foreach (FreeDPolledPacket polled in _polledPackets)
-        {
-            FreeDMerger merger = GetOrCreateMerger(polled.received.packet.CameraId);
-            merger.Put(polled.receiverIndex, polled.received.packet, polled.received.receivedMs);
-        }
-    }
-
-    private FreeDMerger GetOrCreateMerger(int cameraId)
-    {
-        if (!_mergersByCameraId.TryGetValue(cameraId, out FreeDMerger merger))
-        {
-            merger = new FreeDMerger(FieldsOfOpenedReceivers());
-            _mergersByCameraId[cameraId] = merger;
-        }
-        return merger;
-    }
-
-    private List<FreeDFields> FieldsOfOpenedReceivers()
-    {
-        var fields = new List<FreeDFields>();
-        foreach (FreeDReceiver receiver in _openedReceivers)
-        {
-            fields.Add(receiver.Fields);
-        }
-        return fields;
-    }
-
-    /// <summary>カメラ ID ごとに、遅延を過ぎたパケットを合成して、Tracker が TryGet で読める値にする。</summary>
+    /// <summary>カメラ ID ごとに、遅延を過ぎたパケットを合成して、Tracker が TryGet で読める値にする。Inspector に出す状態も更新する。</summary>
     private void MergeAll(double nowMs)
     {
         foreach (KeyValuePair<int, FreeDMerger> pair in _mergersByCameraId)
         {
             FreeDMerger merger = pair.Value;
-            ApplyDelays(merger);
+            bool isReceiving = false;
+            for (int receiverIndex = 0; receiverIndex < _openedReceivers.Count; receiverIndex++)
+            {
+                merger.SetDelay(receiverIndex, _openedReceivers[receiverIndex].delayMs);
+                isReceiving |= merger.IsReceiving(receiverIndex, nowMs);
+            }
             FreeDFields filled = merger.Update(nowMs, out FreeDPacket packet);
-            _mergedByCameraId[pair.Key] = new FreeDMergedCamera
-            {
-                filled = filled,
-                packet = packet,
-                isReceiving = IsAnyReceiverReceiving(merger, nowMs),
-            };
-        }
-    }
+            _mergedByCameraId[pair.Key] = new FreeDMergedCamera { filled = filled, packet = packet, isReceiving = isReceiving };
 
-    private void ApplyDelays(FreeDMerger merger)
-    {
-        for (int receiverIndex = 0; receiverIndex < _openedReceivers.Count; receiverIndex++)
-        {
-            merger.SetDelay(receiverIndex, _openedReceivers[receiverIndex].delayMs);
-        }
-    }
-
-    private bool IsAnyReceiverReceiving(FreeDMerger merger, double nowMs)
-    {
-        for (int receiverIndex = 0; receiverIndex < _openedReceivers.Count; receiverIndex++)
-        {
-            if (merger.IsReceiving(receiverIndex, nowMs))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // ---- 状態の集計 (Inspector に出す値) ----
-
-    /// <summary>各 Receiver の受信状態から、全体の受信中と合計 pkt/s を集める。</summary>
-    private void UpdateReceiverSummary()
-    {
-        receiving = false;
-        totalPacketsPerSecond = 0;
-        foreach (FreeDReceiver receiver in _openedReceivers)
-        {
-            receiving |= receiver.status.isReceiving;
-            totalPacketsPerSecond += receiver.status.packetsPerSecond;
-        }
-    }
-
-    private void UpdateCameraStatus()
-    {
-        foreach (KeyValuePair<int, FreeDMergedCamera> pair in _mergedByCameraId)
-        {
             FreeDCameraStatus status = FindOrAddCameraStatus(pair.Key);
-            status.isReceiving = pair.Value.isReceiving;
-            if (status.lastFilled == pair.Value.filled)
+            status.isReceiving = isReceiving;
+            if (status.lastFilled != filled)
             {
-                continue;
+                status.lastFilled = filled;
+                status.fields = filled.ToString();
             }
-            status.lastFilled = pair.Value.filled;
-            status.fields = pair.Value.filled.ToString();
         }
     }
 
