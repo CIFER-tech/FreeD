@@ -5,6 +5,7 @@ FreeD (D1, 29 バイト) メッセージの符号化・復号ライブラリ (C#
 [retroloc](../retroloc) から切り出した共有ライブラリで、他のプロジェクトからも参照する想定。
 
 Unity からは Package Manager 経由でも導入できる ([`Unity/`](Unity) 参照、UPM パッケージ `tech.cifer.freed`)。
+Unity のパッケージは、受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) を使う (`Packages/manifest.json` に足す。手順は [`Unity/README.md`](Unity/README.md))。
 
 ## 使い方
 

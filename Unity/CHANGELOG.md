@@ -9,7 +9,7 @@
   - `FreeDReceiver` (Model): ポート 1 つで受信して、復号したパケットをためるだけ。ポートごとに置き、使う項目 (`fields`) と遅延 (`delayMs`) を持つ。`streams` は廃止。同じ項目を 2 つの Receiver が担当していると、Manager がエラーを出して受信を始めない。
   - `FreeDTracker` (新規、View): `cameraId` を指定して値を受け取り、自分のオブジェクトの位置・向き・レンズに反映する。`rotationScale` (旧 `panSign` / `tiltSign` / `rollSign`。符号ではなく倍率としてかけるので改名)・`positionScale` (新規。位置にかける倍率)・`positionOffset` / `rotationOffset` を持つ。
   - Receiver と Tracker は、Unity の `Awake`・`OnEnable`・`Update` などを使わない。
-- 受信は毎フレーム GC を起こさない (SocketAsyncEventArgs と使い回すバッファ、固定サイズの輪の待ち行列)。
+- 受信したパケットは、固定サイズのリングバッファにためる。Manager が取りに来ない間にあふれたら、古いものを捨てる。
 - 受信したパケットをためる待ち行列を、自前の実装から、パッケージ `tech.cifer.ringbuffer` の `RingBuffer<T>` に置き換えた。FreeD を使うプロジェクトの `Packages/manifest.json` に、このパッケージを足す必要がある。
 - `FreeDOrigin` を廃止。`FreeDTracker` の親のオブジェクトが原点になる。親の Position と Rotation の Y で、原点の位置と向きを決める。
 - `FreeDLens` を廃止し、ズーム・フォーカスの AnimationCurve と焦点距離・ピント距離の反映を `FreeDTracker` に統合した。
