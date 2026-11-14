@@ -45,7 +45,7 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 2. 空のオブジェクト (Manager の子でもよい) に `FreeDReceiver` を追加し、`Port` を retroloc の「FreeD送信」のポート (既定 40000) に合わせる。
 3. 空のオブジェクトを 1 つ作り、retroloc の原点にあたる Unity 上の場所と向きに合わせる (Position と Rotation の Y)。Scene ビューの青い矢印 = retroloc の Y、赤い矢印 = X。床は水平とみなすので、Rotation の X・Z は 0 にする。
 4. その子に Unity のカメラを置き、`FreeDTracker` を追加する。`Camera Id` を送信側のカメラ ID (retroloc は既定 1) に合わせる。
-5. 再生すると、Receiver と Tracker の Inspector に受信状態・位置 (mm)・角度 (°) が出る。
+5. 再生すると、Manager・Receiver・Tracker の Inspector に受信状態・位置 (mm)・角度 (°) が出る。
 6. 向きが逆なら、`Rotation Scale` の該当する軸 (X=パン, Y=チルト, Z=ロール) を -1 にする。カメラ取り付けのずれは `Position Offset` / `Rotation Offset` で合わせる (どちらも Unity の座標・向きで指定。カメラのローカル軸: 右・上・前、回転は Transform の Rotation と同じ)。
 
 座標は retroloc のワールド (X=右, Y=前, Z=上, m) から Unity へ `(x, y, z) → (x, z, y)` で変換する。

@@ -21,7 +21,25 @@ public class FreeDManager : MonoBehaviour
         public bool isReceiving;
     }
 
+    /// <summary>届いたカメラ ID ごとの状態 (Inspector で見る用)。</summary>
+    [System.Serializable]
+    public class CameraStatus
+    {
+        public int cameraId;
+        public bool isReceiving;
+        public string fields;
+        [System.NonSerialized] internal FreeDFields lastFilled = (FreeDFields)(-1);
+    }
+
     public static FreeDManager Instance { get; private set; }
+
+    // 状態の欄は FreeDManagerEditor が枠で囲んで描く (Header は付けない)
+    [FreeDReadOnly] public bool receiving;
+    [Tooltip("受信を開いた Receiver の数。0 なら、Receiver がないか、ポートを開けていない"), FreeDReadOnly]
+    public int openedReceiverCount;
+    [Tooltip("全 Receiver が直近 1 秒に受けたパケットの合計"), FreeDReadOnly]
+    public int totalPacketsPerSecond;
+    public List<CameraStatus> cameras = new List<CameraStatus>();
 
     private readonly object _lock = new object();
     private readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -60,6 +78,7 @@ public class FreeDManager : MonoBehaviour
             MergeAll(nowMs);
             foreach (FreeDReceiver r in _receivers) r.receiving = nowMs - r.lastReceivedMs < TimeoutMs;
             PublishRates();
+            PublishStatus();
         }
     }
 
@@ -101,6 +120,10 @@ public class FreeDManager : MonoBehaviour
         _receivers.Clear();
         _mergersByCameraId.Clear();
         _mergedByCameraId.Clear();
+        cameras.Clear();
+        receiving = false;
+        openedReceiverCount = 0;
+        totalPacketsPerSecond = 0;
     }
 
     /// <summary>ポート・項目・本数のどれかが変わると値が変わる。再生中の設定変更で受信をやり直す目印。</summary>
@@ -162,7 +185,43 @@ public class FreeDManager : MonoBehaviour
     {
         _rateTimerSeconds += Time.unscaledDeltaTime;
         if (_rateTimerSeconds < 1f) return;
-        foreach (FreeDReceiver r in _receivers) r.PublishRates(_rateTimerSeconds);
+        totalPacketsPerSecond = 0;
+        foreach (FreeDReceiver r in _receivers)
+        {
+            r.PublishRates(_rateTimerSeconds);
+            totalPacketsPerSecond += r.packetsPerSecond;
+        }
         _rateTimerSeconds = 0f;
+    }
+
+    /// <summary>_lock の中で呼ぶ。</summary>
+    void PublishStatus()
+    {
+        openedReceiverCount = _receivers.Count;
+        receiving = false;
+        foreach (FreeDReceiver r in _receivers) receiving |= r.receiving;
+
+        foreach (KeyValuePair<int, Merged> pair in _mergedByCameraId)
+        {
+            CameraStatus status = FindOrAddCameraStatus(pair.Key);
+            status.isReceiving = pair.Value.isReceiving;
+            if (status.lastFilled == pair.Value.filled) continue;
+            status.lastFilled = pair.Value.filled;
+            status.fields = pair.Value.filled.ToString();
+        }
+    }
+
+    /// <summary>cameras はカメラ ID の昇順に保つ。</summary>
+    CameraStatus FindOrAddCameraStatus(int cameraId)
+    {
+        int insertIndex = 0;
+        for (; insertIndex < cameras.Count; insertIndex++)
+        {
+            if (cameras[insertIndex].cameraId == cameraId) return cameras[insertIndex];
+            if (cameras[insertIndex].cameraId > cameraId) break;
+        }
+        var status = new CameraStatus { cameraId = cameraId };
+        cameras.Insert(insertIndex, status);
+        return status;
     }
 }

@@ -5,7 +5,7 @@
 互換性のない変更。1.3.0 までのシーンは組み直しが必要 (手順は README)。
 
 - `FreeDReceiver` を、受信・合成・反映をすべて持つ形から、3 つのコンポーネントに分けた。
-  - `FreeDManager` (新規): 受信の開始・停止と、カメラ ID ごとの合成を管理する。シーンになければ、受信も反映も行われない。
+  - `FreeDManager` (新規): 受信の開始・停止と、カメラ ID ごとの合成を管理する。シーンになければ、受信も反映も行われない。状態として、受信中・開いている Receiver の数・合計 pkt/s・届いたカメラ ID ごとの受信状態と値が入った項目を Inspector に出す。
   - `FreeDReceiver`: ポート 1 つで受信するだけ。ポートごとに置き、使う項目 (`fields`) と遅延 (`delayMs`) を持つ。`streams` は廃止。
   - `FreeDTracker` (新規): `cameraId` を指定して値を受け取り、自分のオブジェクトの位置・向きに反映する。`rotationScale` (旧 `panSign` / `tiltSign` / `rollSign`。符号ではなく倍率としてかけているので改名)・`positionOffset` / `rotationOffset` を持つ。
 - `FreeDOrigin` を廃止。`FreeDTracker` の親のオブジェクトが原点になる。親の Position と Rotation の Y で、原点の位置と向きを決める。
