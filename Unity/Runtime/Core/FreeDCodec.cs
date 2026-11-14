@@ -46,7 +46,7 @@ namespace CIFER.tech.FreeD.Core
         {
             if (destination.Length < PacketLength)
             {
-                    throw new ArgumentException($"destination must be at least {PacketLength} bytes.", nameof(destination));
+                throw new ArgumentException($"destination must be at least {PacketLength} bytes.", nameof(destination));
             }
 
             destination[0] = MessageTypeD1;
@@ -73,10 +73,12 @@ namespace CIFER.tech.FreeD.Core
             {
                 return false;
             }
+
             if (source[0] != MessageTypeD1)
             {
                 return false;
             }
+
             if (source[PacketLength - 1] != Checksum(source.Slice(0, PacketLength - 1)))
             {
                 return false;
@@ -103,6 +105,7 @@ namespace CIFER.tech.FreeD.Core
             {
                 sum += bytesBeforeChecksum[i];
             }
+
             return (byte)((0x40 - sum) & 0xFF);
         }
 
@@ -113,14 +116,17 @@ namespace CIFER.tech.FreeD.Core
             {
                 return 0;
             }
+
             if (raw < Signed24Min)
             {
                 return Signed24Min;
             }
+
             if (raw > Signed24Max)
             {
                 return Signed24Max;
             }
+
             return (int)raw;
         }
 
@@ -137,6 +143,7 @@ namespace CIFER.tech.FreeD.Core
             {
                 value = Unsigned24Max;
             }
+
             d[offset] = (byte)((value >> 16) & 0xFF);
             d[offset + 1] = (byte)((value >> 8) & 0xFF);
             d[offset + 2] = (byte)(value & 0xFF);
