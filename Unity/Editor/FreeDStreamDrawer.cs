@@ -23,7 +23,7 @@ public class FreeDStreamDrawer : PropertyDrawer
 
     static float StatusBoxHeight(SerializedProperty stream)
     {
-        return BoxPadding * 2 + LineHeight + Spacing + FieldsHeight(stream, StatusNames);
+        return BoxPadding * 2 + FieldsHeight(stream, StatusNames);
     }
 
     public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
@@ -51,8 +51,7 @@ public class FreeDStreamDrawer : PropertyDrawer
         Rect inner = new Rect(box.x + BoxPadding, box.y + BoxPadding, box.width - BoxPadding * 2, box.height - BoxPadding * 2);
         int savedIndentLevel = EditorGUI.indentLevel;
         EditorGUI.indentLevel = 0;
-        EditorGUI.LabelField(new Rect(inner.x, inner.y, inner.width, LineHeight), "状態", EditorStyles.boldLabel);
-        float innerY = inner.y + LineHeight + Spacing;
+        float innerY = inner.y;
         foreach (string name in StatusNames)
             innerY = DrawField(inner, innerY, property.FindPropertyRelative(name));
         EditorGUI.indentLevel = savedIndentLevel;

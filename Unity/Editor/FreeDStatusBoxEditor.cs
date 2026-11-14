@@ -21,7 +21,6 @@ public abstract class FreeDStatusBoxEditor : Editor
         EditorGUILayout.Space();
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
-            EditorGUILayout.LabelField("状態", EditorStyles.boldLabel);
             foreach (string name in StatusPropertyNames)
                 EditorGUILayout.PropertyField(serializedObject.FindProperty(name));
         }
