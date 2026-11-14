@@ -10,10 +10,7 @@ namespace CIFER.tech.FreeD.Unity
     {
         private readonly List<FreeDReceiverForUnity> receivers = new();
         private readonly List<FreeDTracker> trackers = new();
-        private readonly Dictionary<int, FreeDPacket> mergedPackets = new();
-
-        // カメラ ID ごとに、Receiver から届いたことのある項目。
-        private readonly Dictionary<int, FreeDField> receivedFieldsByCameraId = new();
+        private readonly Dictionary<int, FreeDMergedCamera> mergedCameras = new();
 
         private void OnEnable()
         {
@@ -52,8 +49,7 @@ namespace CIFER.tech.FreeD.Unity
                 receiver.Close();
             }
 
-            mergedPackets.Clear();
-            receivedFieldsByCameraId.Clear();
+            mergedCameras.Clear();
             receivers.Clear();
             trackers.Clear();
         }
@@ -73,14 +69,13 @@ namespace CIFER.tech.FreeD.Unity
                 while (receiver.TryTakeNext(out var packet))
                 {
                     var cameraId = packet.packet.CameraId;
-                    mergedPackets.TryGetValue(cameraId, out var mergedPacket);
+                    mergedCameras.TryGetValue(cameraId, out var mergedCamera);
 
                     // この Receiver の担当項目だけを新しい値にし、残りは今までの値を保つ。
-                    mergedPackets[cameraId] =
-                        FreeDMerger.Merge(mergedPacket, ~receiver.Field, packet.packet, receiver.Field);
-
-                    receivedFieldsByCameraId.TryGetValue(cameraId, out var receivedFields);
-                    receivedFieldsByCameraId[cameraId] = receivedFields | receiver.Field;
+                    mergedCamera.packet =
+                        FreeDMerger.Merge(mergedCamera.packet, ~receiver.Field, packet.packet, receiver.Field);
+                    mergedCamera.receivedFields |= receiver.Field;
+                    mergedCameras[cameraId] = mergedCamera;
                 }
             }
 
@@ -91,10 +86,9 @@ namespace CIFER.tech.FreeD.Unity
                     continue;
                 }
 
-                if (mergedPackets.TryGetValue(tracker.CameraId, out var mergedPacket))
+                if (mergedCameras.TryGetValue(tracker.CameraId, out var mergedCamera))
                 {
-                    receivedFieldsByCameraId.TryGetValue(tracker.CameraId, out var receivedFields);
-                    tracker.Apply(mergedPacket, receivedFields);
+                    tracker.Apply(mergedCamera.packet, mergedCamera.receivedFields);
                 }
             }
         }
