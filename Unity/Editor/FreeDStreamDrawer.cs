@@ -8,7 +8,7 @@ public class FreeDStreamDrawer : PropertyDrawer
     static readonly string[] SettingNames = { "port", "cameraId", "fields", "delayMs" };
     static readonly string[] StatusNames = { "receiving", "packetsPerSecond", "meanIntervalMs", "maxIntervalMs" };
 
-    const float BoxPadding = 6f;
+    const float BoxPadding = 0f;
 
     static float LineHeight { get { return EditorGUIUtility.singleLineHeight; } }
     static float Spacing { get { return EditorGUIUtility.standardVerticalSpacing; } }
