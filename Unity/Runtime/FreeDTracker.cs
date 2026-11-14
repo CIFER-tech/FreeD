@@ -17,6 +17,8 @@ public class FreeDTracker : MonoBehaviour
 
     [Tooltip("角度にかける倍率。X=パン, Y=チルト, Z=ロール。向きが逆なら -1")]
     public Vector3 rotationScale = Vector3.one;
+    [Tooltip("位置にかける倍率。X=右, Y=前, Z=上 (FreeD 座標)。向きが逆なら -1")]
+    public Vector3 positionScale = Vector3.one;
     [Tooltip("トラッカーからカメラまで (Unity のカメラの軸: X=右, Y=上, Z=前, m)")]
     public Vector3 positionOffset = Vector3.zero;
     [Tooltip("度。Unity のカメラの軸まわり (X=チルト, Y=パン, Z=ロール)。Transform の Rotation と同じ向き")]
@@ -25,7 +27,7 @@ public class FreeDTracker : MonoBehaviour
     // 状態の欄は FreeDTrackerEditor が枠で囲んで描く (Header は付けない)
     [FreeDReadOnly] public bool receiving;
     [Tooltip("度。X=パン, Y=チルト, Z=ロール (倍率をかけたあと)"), FreeDReadOnly] public Vector3 panTiltRollDeg;
-    [Tooltip("mm。FreeD 座標 (X=右, Y=前, Z=上)"), FreeDReadOnly] public Vector3 positionMm;
+    [Tooltip("mm。FreeD 座標 (X=右, Y=前, Z=上) (倍率をかけたあと)"), FreeDReadOnly] public Vector3 positionMm;
     [FreeDReadOnly] public bool hasZoom;
     [Tooltip("ズームのエンコーダの生の値 (24bit)。FreeDLens が焦点距離に直す"), FreeDReadOnly] public uint zoomRaw;
     [FreeDReadOnly] public bool hasFocus;
@@ -69,15 +71,18 @@ public class FreeDTracker : MonoBehaviour
         {
             panTiltRollDeg = new Vector3(panDeg, tiltDeg, rollDeg);
         }
+        float xMeters = (float)p.XMeters * positionScale.x;
+        float yMeters = (float)p.YMeters * positionScale.y;
+        float zMeters = (float)p.ZMeters * positionScale.z;
         if (hasPosition)
         {
-            positionMm = new Vector3((float)(p.XMeters * 1000), (float)(p.YMeters * 1000), (float)(p.ZMeters * 1000));
+            positionMm = new Vector3(xMeters * 1000, yMeters * 1000, zMeters * 1000);
         }
 
         // retroloc 座標 (X右 Y前 Z上) の姿勢。AngleAxis は数値的に標準の回転なので、そのまま合成できる。
         // 回転を担当する Receiver がないときは p の角度が 0 なので、単位回転になる。
         Quaternion q = Rot(panDeg, tiltDeg, rollDeg);
-        Vector3 pos = new Vector3((float)p.XMeters, (float)p.YMeters, (float)p.ZMeters);
+        Vector3 pos = new Vector3(xMeters, yMeters, zMeters);
 
         // Unity 座標へ変換してから、Unity のカメラのローカル軸でオフセットを適用する
         Vector3 uPos = new Vector3(pos.x, pos.z, pos.y);

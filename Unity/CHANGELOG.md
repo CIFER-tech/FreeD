@@ -7,7 +7,7 @@
 - `FreeDReceiver` を、受信・合成・反映をすべて持つ形から、3 つのコンポーネントに分けた。
   - `FreeDManager` (新規): 受信の開始・停止と、カメラ ID ごとの合成を管理する。シーンになければ、受信も反映も行われない。状態として、受信中・合計 pkt/s・ポートごとの受信状態 (pkt/s・間隔)・届いたカメラ ID ごとの受信状態と値が入った項目を Inspector に出す。
   - `FreeDReceiver`: ポート 1 つで受信して、復号したパケットを保持するだけ (Manager が毎フレーム取りに行く)。ポートごとに置き、使う項目 (`fields`) と遅延 (`delayMs`) を持つ。`streams` は廃止。受信状態の集計と、項目の重なりの検査は Manager が行う (重なっていると、エラーを出して受信を始めない)。
-  - `FreeDTracker` (新規): `cameraId` を指定して値を受け取り、自分のオブジェクトの位置・向きに反映する。`rotationScale` (旧 `panSign` / `tiltSign` / `rollSign`。符号ではなく倍率としてかけているので改名)・`positionOffset` / `rotationOffset` を持つ。
+  - `FreeDTracker` (新規): `cameraId` を指定して値を受け取り、自分のオブジェクトの位置・向きに反映する。`rotationScale` (旧 `panSign` / `tiltSign` / `rollSign`。符号ではなく倍率としてかけているので改名)・`positionScale` (新規。位置にかける倍率)・`positionOffset` / `rotationOffset` を持つ。
 - `FreeDOrigin` を廃止。`FreeDTracker` の親のオブジェクトが原点になる。親の Position と Rotation の Y で、原点の位置と向きを決める。
 - `FreeDLens` を、`FreeDTracker` と同じオブジェクトに付ける形にした。
 - 使う項目を、4 つのチェックボックスから、複数選べるドロップダウン (`FreeDFields`) に変更。並びは Position・Rotation・Zoom・Focus。
