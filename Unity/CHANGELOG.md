@@ -4,16 +4,16 @@
 
 互換性のない変更。1.3.0 までのシーンは組み直しが必要 (手順は README)。
 
-- `FreeDReceiver` を、受信・合成・反映をすべて持つ形から、3 つのコンポーネントに分けた。
-  - `FreeDManager` (新規): 受信の開始・停止と、カメラ ID ごとの合成を管理する。シーンになければ、受信も反映も行われない。状態として、受信中・合計 pkt/s・届いたカメラ ID ごとの受信状態と値が入った項目を Inspector に出す。
-  - `FreeDReceiver`: ポート 1 つで受信して、復号したパケットを保持するだけ (Manager が毎フレーム取りに行く)。受信・保持・取り出しは、毎フレーム GC を起こさない (SocketAsyncEventArgs と使い回すバッファ、固定サイズの輪の待ち行列)。ポートごとに置き、使う項目 (`fields`) と遅延 (`delayMs`) を持つ。`streams` は廃止。受信状態 (pkt/s・受信間隔・途切れ) は Receiver が持って、Inspector に出す。項目の重なりの検査は Manager が行う (重なっていると、エラーを出して受信を始めない)。
-  - Receiver と Tracker は、Unity の `Awake`・`OnEnable`・`Update` などを使わない。寿命と毎フレームの処理は、すべて Manager が行う (Manager は Receiver と Tracker を、開始時にシーンから探す。あとから置いたものは、再生を始め直すまで対象にならない)。
-  - `FreeDTracker` (新規): `cameraId` を指定して値を受け取り、自分のオブジェクトの位置・向きに反映する。`rotationScale` (旧 `panSign` / `tiltSign` / `rollSign`。符号ではなく倍率としてかけているので改名)・`positionScale` (新規。位置にかける倍率)・`positionOffset` / `rotationOffset` を持つ。
+- `FreeDReceiver` を、受信・合成・反映をすべて持つ形から、3 つのコンポーネントに分けた (MVP)。
+  - `FreeDManager` (新規、Presenter): シーンに 1 つ置く。Receiver と Tracker の寿命と毎フレームの処理をすべて持つ。各 Receiver のパケットを取り出し、カメラ ID ごとに合成して Tracker に反映する。シーンになければ、受信も反映も行われない。Receiver と Tracker は開始時にシーンから探す (あとから置いたものは、再生を始め直すまで対象にならない)。
+  - `FreeDReceiver` (Model): ポート 1 つで受信して、復号したパケットをためるだけ。ポートごとに置き、使う項目 (`fields`) と遅延 (`delayMs`) を持つ。`streams` は廃止。同じ項目を 2 つの Receiver が担当していると、Manager がエラーを出して受信を始めない。
+  - `FreeDTracker` (新規、View): `cameraId` を指定して値を受け取り、自分のオブジェクトの位置・向き・レンズに反映する。`rotationScale` (旧 `panSign` / `tiltSign` / `rollSign`。符号ではなく倍率としてかけるので改名)・`positionScale` (新規。位置にかける倍率)・`positionOffset` / `rotationOffset` を持つ。
+  - Receiver と Tracker は、Unity の `Awake`・`OnEnable`・`Update` などを使わない。
+- 受信は毎フレーム GC を起こさない (SocketAsyncEventArgs と使い回すバッファ、固定サイズの輪の待ち行列)。
 - `FreeDOrigin` を廃止。`FreeDTracker` の親のオブジェクトが原点になる。親の Position と Rotation の Y で、原点の位置と向きを決める。
 - `FreeDLens` を廃止し、ズーム・フォーカスの AnimationCurve と焦点距離・ピント距離の反映を `FreeDTracker` に統合した。
 - 使う項目を、4 つのチェックボックスから、複数選べるドロップダウン (`FreeDFields`) に変更。並びは Position・Rotation・Zoom・Focus。
-- 状態の欄を、編集できない表示だけの欄にし、枠で囲んだ (Editor 用のアセンブリ `FreeD.Unity.Editor` を追加)。`pan`/`tilt`/`roll` と `xMm`/`yMm`/`zMm` は、Vector3 の `rotation` (度) と `position` (m) にまとめた。`hasZoom`/`hasFocus` は廃止。
-- 再生中の左上の表示 (OnGUI) を廃止。状態は Inspector で見る。
+- 状態の表示を廃止。Inspector の状態の欄 (受信中・pkt/s・受信間隔・角度・位置・ズームとフォーカスの値など) と、再生中の左上の表示 (OnGUI) を消した。
 
 ## [1.3.0] - 2026-10-30
 
