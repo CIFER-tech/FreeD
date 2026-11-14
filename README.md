@@ -22,7 +22,8 @@ var buffer = new byte[FreeDCodec.PacketLength];
 FreeDCodec.Encode(packet, buffer);                  // 29 バイト。24bit の範囲を超える値は飽和
 // udp.Send(buffer, FreeDCodec.PacketLength, ...);
 
-if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* 長さ・種別・チェックサムが正しいときだけ true */ }
+var decoded = new FreeDPacket();   // 毎回作らず、使い回す。TryDecode は、これに書き込む (確保しない)
+if (FreeDCodec.TryDecode(received, decoded)) { /* 長さ・種別・チェックサムが正しいときだけ true */ }
 ```
 
 ## メッセージ配置
@@ -50,13 +51,16 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* 長さ・種別・�
 姿勢とレンズ (ズーム・フォーカス) のように、別々に届く FreeD を `FreeDMerger.Merge` で 1 つの `FreeDPacket` にまとめる。
 
 ```csharp
-// 姿勢は posePacket から、ズームとフォーカスは lensPacket から取った新しいパケットが返る
-FreeDPacket merged = FreeDMerger.Merge(
+// 姿勢は posePacket から、ズームとフォーカスは lensPacket から取って、merged に書き込む (確保しない)
+var merged = new FreeDPacket();
+FreeDMerger.Merge(
+    merged,
     posePacket, FreeDField.Rotation | FreeDField.Position,
     lensPacket, FreeDField.Zoom | FreeDField.Focus);
 ```
 
-- 項目が重なったときは、2 つ目のパケットの値を使う。
+- 項目が重なったときは、2 つ目のパケットの値を使う。`merged` は、2 つのパケットとは別のオブジェクトにする。
+- 選んだ項目だけを、既存のパケットに上書きするには `FreeDMerger.CopyFields` を使う。
 - 状態は持たない。最後に届いた値を保つこと、遅延、途切れの扱いは呼び出し側で行う。
 - Unity では `FreeDManager`・`FreeDReceiverForUnity`・`FreeDTracker` が使っている ([`src/FreeD.Unity/`](src/FreeD.Unity) 参照)。
 

@@ -27,7 +27,8 @@ var packet = new FreeDPacket
 var buffer = new byte[FreeDCodec.PacketLength];
 FreeDCodec.Encode(packet, buffer);
 
-if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
+var decoded = new FreeDPacket();
+if (FreeDCodec.TryDecode(received, decoded)) { /* ... */ }
 ```
 
 詳しいメッセージ配置・仕様の注意点はリポジトリ直下の [README](../../README.md) を参照。
