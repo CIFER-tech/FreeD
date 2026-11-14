@@ -30,7 +30,8 @@ namespace CIFER.tech.FreeD.Core
         private const double PositionScale = 64.0 * 1000.0; // 1/64 mm → m あたり 64000
         private const int Signed24Min = -8388608;
         private const int Signed24Max = 8388607;
-        private const uint Unsigned24Max = 0xFFFFFF;
+        /// <summary>ズーム・フォーカスの生の値の最大 (24bit 符号なし)。</summary>
+        public const uint Unsigned24Max = 0xFFFFFF;
 
         /// <summary>29 バイトを書き込み、書き込んだバイト数を返す。値は 24bit の範囲に飽和させる。</summary>
         public static int Encode(in FreeDPacket p, Span<byte> destination)

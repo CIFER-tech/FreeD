@@ -8,17 +8,14 @@ namespace CIFER.tech.FreeD.Unity
     {
         private const float GizmoArrowLengthM = 0.5f;
 
-        // ズームとフォーカスの生の値は 24bit (0 から 16777215)。
-        private const float RawValueMax = 0xFFFFFF;
-
         [SerializeField] private int cameraId = 1;
         [SerializeField] private Camera camera;
         [SerializeField] private Vector3 rotationScale = Vector3.one;
         [SerializeField] private Vector3 positionScale = Vector3.one;
         [SerializeField] private Vector3 positionOffset = Vector3.zero;
         [SerializeField] private Vector3 rotationOffset = Vector3.zero;
-        [SerializeField] private AnimationCurve zoomToFocalLengthMm = AnimationCurve.Linear(0f, 0f, RawValueMax, 1f);
-        [SerializeField] private AnimationCurve focusToDistanceM = AnimationCurve.Linear(0f, 0f, RawValueMax, 1f);
+        [SerializeField] private AnimationCurve zoomToFocalLengthMm = AnimationCurve.Linear(0f, 0f, FreeDCodec.Unsigned24Max, 1f);
+        [SerializeField] private AnimationCurve focusToDistanceM = AnimationCurve.Linear(0f, 0f, FreeDCodec.Unsigned24Max, 1f);
 
         public int CameraId
         {
