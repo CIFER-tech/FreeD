@@ -16,18 +16,22 @@ public class FreeDManager : MonoBehaviour
     // 無効なものも含む。
     private readonly List<FreeDReceiver> _receivers = new List<FreeDReceiver>();
     private readonly List<FreeDTracker> _trackers = new List<FreeDTracker>();
-
-    private bool _isFieldsOverlapped;
-
     private readonly Dictionary<int, FreeDMerger> _mergersByCameraId = new Dictionary<int, FreeDMerger>();
 
+    private bool _isFieldsOverlapped;
+    
     private void OnEnable()
     {
         _receivers.Clear();
         _trackers.Clear();
-#if UNITY_2022_2_OR_NEWER
-        _receivers.AddRange(FindObjectsByType<FreeDReceiver>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
-        _trackers.AddRange(FindObjectsByType<FreeDTracker>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
+        
+#if UNITY_6000_0_OR_NEWER
+        // 並び順の指定 (FindObjectsSortMode) は、Unity 6 で廃止された。順序は、合成のストリームの番号に使うだけなので、決まっていなくてよい。
+        _receivers.AddRange(FindObjectsByType<FreeDReceiver>(FindObjectsInactive.Include));
+        _trackers.AddRange(FindObjectsByType<FreeDTracker>(FindObjectsInactive.Include));
+#elif UNITY_2022_2_OR_NEWER
+        _receivers.AddRange(FindObjectsByType<FreeDReceiver>(FindObjectsInactive.Include, FindObjectsSortMode.None));
+        _trackers.AddRange(FindObjectsByType<FreeDTracker>(FindObjectsInactive.Include, FindObjectsSortMode.None));
 #else
         _receivers.AddRange(FindObjectsOfType<FreeDReceiver>(true));
         _trackers.AddRange(FindObjectsOfType<FreeDTracker>(true));
@@ -37,7 +41,7 @@ public class FreeDManager : MonoBehaviour
     private void OnDisable()
     {
         // 再生中に消された Receiver も、ソケットを閉じる (Close は C# の項目だけを使うので、消えたあとでも呼べる)。
-        foreach (FreeDReceiver receiver in _receivers)
+        foreach (var receiver in _receivers)
         {
             receiver.Close();
         }
@@ -47,10 +51,10 @@ public class FreeDManager : MonoBehaviour
     private void Update()
     {
         // 担当する項目が変わったら (有効・無効の切り替えを含む)、合成をやり直す。
-        bool isFieldsChanged = false;
-        for (int streamIndex = 0; streamIndex < _receivers.Count; streamIndex++)
+        var isFieldsChanged = false;
+        for (var streamIndex = 0; streamIndex < _receivers.Count; streamIndex++)
         {
-            FreeDReceiver receiver = _receivers[streamIndex];
+            var receiver = _receivers[streamIndex];
             if (receiver == null)
             {
                 // 再生中に消された Receiver。ソケットを閉じて、一覧から外す (ストリームの番号が変わるので、合成をやり直す)。
@@ -71,9 +75,9 @@ public class FreeDManager : MonoBehaviour
             // FreeDMerger は同じ項目を 2 つのストリームが担当すると合成できないので、重なっていたら合成しない。
             var claimedFields = FreeDFields.None;
             _isFieldsOverlapped = false;
-            foreach (FreeDReceiver receiver in _receivers)
+            foreach (var receiver in _receivers)
             {
-                FreeDFields overlappedFields = claimedFields & receiver.ActiveFields;
+                var overlappedFields = claimedFields & receiver.ActiveFields;
                 if (overlappedFields != FreeDFields.None)
                 {
                     Debug.LogError("FreeD: 同じ項目を複数の Receiver が担当している: " + overlappedFields, this);
@@ -89,15 +93,15 @@ public class FreeDManager : MonoBehaviour
             return;
         }
 
-        for (int streamIndex = 0; streamIndex < _receivers.Count; streamIndex++)
+        for (var streamIndex = 0; streamIndex < _receivers.Count; streamIndex++)
         {
-            while (_receivers[streamIndex].TryDequeue(out FreeDReceivedPacket received))
+            while (_receivers[streamIndex].TryDequeue(out var received))
             {
                 int cameraId = received.packet.CameraId;
-                if (!_mergersByCameraId.TryGetValue(cameraId, out FreeDMerger merger))
+                if (!_mergersByCameraId.TryGetValue(cameraId, out var merger))
                 {
                     var activeFieldsPerStream = new List<FreeDFields>();
-                    foreach (FreeDReceiver receiver in _receivers)
+                    foreach (var receiver in _receivers)
                     {
                         activeFieldsPerStream.Add(receiver.ActiveFields);
                     }
@@ -110,24 +114,24 @@ public class FreeDManager : MonoBehaviour
             }
         }
 
-        double nowMs = FreeDClock.NowMs;
-        foreach (KeyValuePair<int, FreeDMerger> cameraIdAndMerger in _mergersByCameraId)
+        var nowMs = FreeDClock.NowMs;
+        foreach (var cameraIdAndMerger in _mergersByCameraId)
         {
-            FreeDMerger merger = cameraIdAndMerger.Value;
+            var merger = cameraIdAndMerger.Value;
             // delayMs は再生中に Inspector で変えられるので、毎フレーム渡す。
-            for (int streamIndex = 0; streamIndex < _receivers.Count; streamIndex++)
+            for (var streamIndex = 0; streamIndex < _receivers.Count; streamIndex++)
             {
                 merger.SetDelay(streamIndex, _receivers[streamIndex].delayMs);
             }
 
             // 値が 1 つも入っていない ID は、Tracker に渡さない。
-            FreeDFields filledFields = merger.Update(nowMs, out FreeDPacket merged);
+            var filledFields = merger.Update(nowMs, out var merged);
             if (filledFields == FreeDFields.None)
             {
                 continue;
             }
 
-            foreach (FreeDTracker tracker in _trackers)
+            foreach (var tracker in _trackers)
             {
                 if (tracker != null && tracker.isActiveAndEnabled && tracker.cameraId == cameraIdAndMerger.Key)
                 {
