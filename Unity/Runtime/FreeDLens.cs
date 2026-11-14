@@ -16,9 +16,9 @@ public class FreeDLens : MonoBehaviour
     [Tooltip("横軸 = フォーカスの生の値、縦軸 = ピント距離 (m)")]
     public AnimationCurve focusToDistanceM = new AnimationCurve();
 
-    [Header("状態 (読み取り専用)")]
-    public float focalLengthMm;
-    [Tooltip("ピントが合う距離 (m)。被写界深度のエフェクトなど、使う側がこの値を読む")]
+    [Header("状態")]
+    [FreeDReadOnly] public float focalLengthMm;
+    [Tooltip("ピントが合う距離 (m)。被写界深度のエフェクトなど、使う側がこの値を読む"), FreeDReadOnly]
     public float focusDistanceM;
 
     private Camera _camera;
