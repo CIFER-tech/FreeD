@@ -17,8 +17,6 @@ public class FreeDManager : MonoBehaviour
     private readonly List<FreeDReceiver> _receivers = new List<FreeDReceiver>();
     private readonly List<FreeDTracker> _trackers = new List<FreeDTracker>();
 
-    // Receiver ごとの、いま担当している項目。無効な Receiver は None。添字が FreeDMerger のストリームの番号になる。
-    private readonly List<FreeDFields> _fieldsPerStream = new List<FreeDFields>();
     private bool _isFieldsOverlapped;
 
     private readonly Dictionary<int, FreeDMerger> _mergersByCameraId = new Dictionary<int, FreeDMerger>();
@@ -34,11 +32,6 @@ public class FreeDManager : MonoBehaviour
         _receivers.AddRange(FindObjectsOfType<FreeDReceiver>(true));
         _trackers.AddRange(FindObjectsOfType<FreeDTracker>(true));
 #endif
-        _fieldsPerStream.Clear();
-        for (int streamIndex = 0; streamIndex < _receivers.Count; streamIndex++)
-        {
-            _fieldsPerStream.Add(FreeDFields.None);
-        }
     }
 
     private void OnDisable()
@@ -58,22 +51,17 @@ public class FreeDManager : MonoBehaviour
         for (int streamIndex = 0; streamIndex < _receivers.Count; streamIndex++)
         {
             FreeDReceiver receiver = _receivers[streamIndex];
-            FreeDFields usedFields = FreeDFields.None;
             if (receiver == null)
             {
+                // 再生中に消された Receiver。ソケットを閉じて、一覧から外す (ストリームの番号が変わるので、合成をやり直す)。
                 receiver.Close();
-            }
-            else
-            {
-                receiver.SyncSocket();
-                usedFields = receiver.isActiveAndEnabled ? receiver.UsedFields : FreeDFields.None;
+                _receivers.RemoveAt(streamIndex);
+                streamIndex--;
+                isFieldsChanged = true;
+                continue;
             }
 
-            if (_fieldsPerStream[streamIndex] != usedFields)
-            {
-                _fieldsPerStream[streamIndex] = usedFields;
-                isFieldsChanged = true;
-            }
+            isFieldsChanged |= receiver.Sync();
         }
 
         if (isFieldsChanged)
@@ -83,15 +71,16 @@ public class FreeDManager : MonoBehaviour
             // FreeDMerger は同じ項目を 2 つのストリームが担当すると合成できないので、重なっていたら合成しない。
             var claimedFields = FreeDFields.None;
             _isFieldsOverlapped = false;
-            foreach (FreeDFields usedFields in _fieldsPerStream)
+            foreach (FreeDReceiver receiver in _receivers)
             {
-                if ((claimedFields & usedFields) != FreeDFields.None)
+                FreeDFields overlappedFields = claimedFields & receiver.ActiveFields;
+                if (overlappedFields != FreeDFields.None)
                 {
-                    Debug.LogError("FreeD: 同じ項目を複数の Receiver が担当している: " + (claimedFields & usedFields), this);
+                    Debug.LogError("FreeD: 同じ項目を複数の Receiver が担当している: " + overlappedFields, this);
                     _isFieldsOverlapped = true;
                 }
 
-                claimedFields |= usedFields;
+                claimedFields |= receiver.ActiveFields;
             }
         }
 
@@ -107,7 +96,13 @@ public class FreeDManager : MonoBehaviour
                 int cameraId = received.packet.CameraId;
                 if (!_mergersByCameraId.TryGetValue(cameraId, out FreeDMerger merger))
                 {
-                    merger = new FreeDMerger(_fieldsPerStream);
+                    var activeFieldsPerStream = new List<FreeDFields>();
+                    foreach (FreeDReceiver receiver in _receivers)
+                    {
+                        activeFieldsPerStream.Add(receiver.ActiveFields);
+                    }
+
+                    merger = new FreeDMerger(activeFieldsPerStream);
                     _mergersByCameraId.Add(cameraId, merger);
                 }
 

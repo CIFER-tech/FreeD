@@ -39,11 +39,15 @@ public class FreeDReceiver : MonoBehaviour
     private bool _isOpenRequested;
     private int _requestedPort;
 
-    internal FreeDFields UsedFields
+    // 前回の Sync のときの ActiveFields。変わったことを Manager に知らせるために覚えておく。
+    private FreeDFields _syncedActiveFields;
+
+    /// <summary>いま担当している項目。無効なときは None。</summary>
+    internal FreeDFields ActiveFields
     {
         get
         {
-            return fields & AllFields;
+            return isActiveAndEnabled ? fields & AllFields : FreeDFields.None;
         }
     }
 
@@ -51,7 +55,8 @@ public class FreeDReceiver : MonoBehaviour
     /// 有効か無効か、ポートが変わったかに合わせて、受信を開く・閉じる。FreeDManager が毎フレーム呼ぶ。
     /// 開くのに失敗したときは、無効にするかポートを変えるまで、開き直さない (毎フレーム、エラーを出さないため)。
     /// </summary>
-    internal void SyncSocket()
+    /// <returns>前回の呼び出しから、担当する項目 (ActiveFields) が変わったか。</returns>
+    internal bool Sync()
     {
         bool shouldOpen = isActiveAndEnabled;
         if (_isOpenRequested && (!shouldOpen || _requestedPort != port))
@@ -65,6 +70,11 @@ public class FreeDReceiver : MonoBehaviour
             _requestedPort = port;
             Open();
         }
+
+        FreeDFields activeFields = ActiveFields;
+        bool isFieldsChanged = activeFields != _syncedActiveFields;
+        _syncedActiveFields = activeFields;
+        return isFieldsChanged;
     }
 
     private void Open()
