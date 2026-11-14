@@ -8,10 +8,10 @@ namespace FreeD
     public enum FreeDFields
     {
         None = 0,
-        Rotation = 1, // パン・チルト・ロール
-        Position = 2, // X・Y・Z
-        Zoom = 4,
-        Focus = 8,
+        Position = 1 << 0, // X・Y・Z
+        Rotation = 1 << 1, // パン・チルト・ロール
+        Zoom = 1 << 2,
+        Focus = 1 << 3,
     }
 
     /// <summary>
