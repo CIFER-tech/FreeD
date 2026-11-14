@@ -33,17 +33,33 @@ public class FreeDReceiver : MonoBehaviour
 
     public FreeDFields Fields
     {
-        get { return fields & AllFields; }
-        set { fields = value; }
+        get
+        {
+            return fields & AllFields;
+        }
+        set
+        {
+            fields = value;
+        }
     }
 
     // 有効・無効が変わったことを Manager に知らせる。受信を開き直すのは Manager。
-    private void OnEnable() { NotifyManager(); }
-    private void OnDisable() { NotifyManager(); }
+    private void OnEnable()
+    {
+        NotifyManager();
+    }
+
+    private void OnDisable()
+    {
+        NotifyManager();
+    }
 
     private static void NotifyManager()
     {
-        if (FreeDManager.Instance != null) FreeDManager.Instance.MarkReceiversChanged();
+        if (FreeDManager.Instance != null)
+        {
+            FreeDManager.Instance.MarkReceiversChanged();
+        }
     }
 
     /// <summary>FreeDManager が呼ぶ。受信を始め、パケットが届くたびに onPacket を受信タスク (スレッドプール) から呼ぶ。</summary>
@@ -68,9 +84,18 @@ public class FreeDReceiver : MonoBehaviour
     /// <summary>FreeDManager が呼ぶ。受信を止めてポートを閉じる。</summary>
     internal void Close()
     {
-        if (_cancellation == null) return;
+        if (_cancellation == null)
+        {
+            return;
+        }
         _cancellation.Cancel();
-        try { _receiveTask.Wait(500); } catch { }
+        try
+        {
+            _receiveTask.Wait(500);
+        }
+        catch
+        {
+        }
         _udp.Close();
         _cancellation.Dispose();
         _udp = null;
@@ -87,10 +112,22 @@ public class FreeDReceiver : MonoBehaviour
             {
                 result = await ReceiveAsync(udp, token);
             }
-            catch (OperationCanceledException) { return; }
-            catch (ObjectDisposedException) { return; }
-            catch (SocketException) { continue; }
-            if (FreeDCodec.TryDecode(result.Buffer, out FreeDPacket p)) onPacket(this, p);
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (ObjectDisposedException)
+            {
+                return;
+            }
+            catch (SocketException)
+            {
+                continue;
+            }
+            if (FreeDCodec.TryDecode(result.Buffer, out FreeDPacket p))
+            {
+                onPacket(this, p);
+            }
         }
     }
 

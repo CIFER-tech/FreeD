@@ -22,12 +22,17 @@ public abstract class FreeDStatusBoxEditor : Editor
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
             foreach (string name in StatusPropertyNames)
-                EditorGUILayout.PropertyField(serializedObject.FindProperty(name));
+            {
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty(name));
+            }
         }
 
         serializedObject.ApplyModifiedProperties();
     }
 
     // 状態は再生中に変わり続けるので、選んでいる間は描き直す。
-    public override bool RequiresConstantRepaint() { return Application.isPlaying; }
+    public override bool RequiresConstantRepaint()
+    {
+        return Application.isPlaying;
+    }
 }

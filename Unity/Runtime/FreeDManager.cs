@@ -42,10 +42,16 @@ public class FreeDManager : MonoBehaviour
     private void OnDisable()
     {
         CloseReceivers();
-        if (Instance == this) Instance = null;
+        if (Instance == this)
+        {
+            Instance = null;
+        }
     }
 
-    private void OnDestroy() { CloseReceivers(); }
+    private void OnDestroy()
+    {
+        CloseReceivers();
+    }
 
     private void Update()
     {
@@ -78,14 +84,20 @@ public class FreeDManager : MonoBehaviour
     }
 
     /// <summary>FreeDReceiver が、有効・無効が変わったときに呼ぶ。次の Update で、受信を開き直す。</summary>
-    internal void MarkReceiversChanged() { _isReceiverSetChanged = true; }
+    internal void MarkReceiversChanged()
+    {
+        _isReceiverSetChanged = true;
+    }
 
     private void OpenReceivers()
     {
         _isReceiverSetChanged = false;
         FindEnabledReceivers();
         _openedSignature = Signature();
-        if (HasOverlappedFields()) return;
+        if (HasOverlappedFields())
+        {
+            return;
+        }
 
         _openedReceivers.AddRange(_foundReceivers);
         foreach (FreeDReceiver r in _openedReceivers)
@@ -104,7 +116,12 @@ public class FreeDManager : MonoBehaviour
         FreeDReceiver[] all = FindObjectsOfType<FreeDReceiver>();
 #endif
         foreach (FreeDReceiver r in all)
-            if (r.isActiveAndEnabled) _foundReceivers.Add(r);
+        {
+                if (r.isActiveAndEnabled)
+                {
+                    _foundReceivers.Add(r);
+                }
+        }
     }
 
     /// <summary>同じ項目を 2 つの Receiver が担当していると、合成できない。</summary>
@@ -126,7 +143,10 @@ public class FreeDManager : MonoBehaviour
 
     private void CloseReceivers()
     {
-        foreach (FreeDReceiver r in _openedReceivers) r.Close();
+        foreach (FreeDReceiver r in _openedReceivers)
+        {
+            r.Close();
+        }
         _openedReceivers.Clear();
         _mergersByCameraId.Clear();
         _mergedByCameraId.Clear();
@@ -143,7 +163,9 @@ public class FreeDManager : MonoBehaviour
         {
             int hash = _foundReceivers.Count;
             foreach (FreeDReceiver r in _foundReceivers)
-                hash = hash * 31 + r.port * 31 + (int)r.Fields;
+            {
+                    hash = hash * 31 + r.port * 31 + (int)r.Fields;
+            }
             return hash;
         }
     }
@@ -155,7 +177,10 @@ public class FreeDManager : MonoBehaviour
         lock (_lock)
         {
             int receiverIndex = _openedReceivers.IndexOf(receiver);
-            if (receiverIndex < 0) return;
+            if (receiverIndex < 0)
+            {
+                return;
+            }
             if (!_mergersByCameraId.TryGetValue(packet.CameraId, out FreeDMerger merger))
             {
                 merger = new FreeDMerger(FieldsOfOpenedReceivers());
@@ -169,7 +194,10 @@ public class FreeDManager : MonoBehaviour
     private List<FreeDFields> FieldsOfOpenedReceivers()
     {
         var fields = new List<FreeDFields>();
-        foreach (FreeDReceiver r in _openedReceivers) fields.Add(r.Fields);
+        foreach (FreeDReceiver r in _openedReceivers)
+        {
+            fields.Add(r.Fields);
+        }
         return fields;
     }
 
@@ -201,7 +229,10 @@ public class FreeDManager : MonoBehaviour
         }
 
         _rateTimerSeconds += Time.unscaledDeltaTime;
-        if (_rateTimerSeconds < 1f) return;
+        if (_rateTimerSeconds < 1f)
+        {
+            return;
+        }
         totalPacketsPerSecond = 0;
         foreach (FreeDReceiverStatus status in receivers)
         {
@@ -218,7 +249,10 @@ public class FreeDManager : MonoBehaviour
         {
             FreeDCameraStatus status = FindOrAddCameraStatus(pair.Key);
             status.isReceiving = pair.Value.isReceiving;
-            if (status.lastFilled == pair.Value.filled) continue;
+            if (status.lastFilled == pair.Value.filled)
+            {
+                continue;
+            }
             status.lastFilled = pair.Value.filled;
             status.fields = pair.Value.filled.ToString();
         }
@@ -230,8 +264,14 @@ public class FreeDManager : MonoBehaviour
         int insertIndex = 0;
         for (; insertIndex < cameras.Count; insertIndex++)
         {
-            if (cameras[insertIndex].cameraId == cameraId) return cameras[insertIndex];
-            if (cameras[insertIndex].cameraId > cameraId) break;
+            if (cameras[insertIndex].cameraId == cameraId)
+            {
+                return cameras[insertIndex];
+            }
+            if (cameras[insertIndex].cameraId > cameraId)
+            {
+                break;
+            }
         }
         var status = new FreeDCameraStatus { cameraId = cameraId };
         cameras.Insert(insertIndex, status);

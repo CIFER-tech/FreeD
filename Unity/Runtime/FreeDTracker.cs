@@ -34,7 +34,10 @@ public class FreeDTracker : MonoBehaviour
     private void LateUpdate()
     {
         FreeDManager manager = FreeDManager.Instance;
-        if (manager == null) return;
+        if (manager == null)
+        {
+            return;
+        }
         if (!manager.TryGet(cameraId, out FreeDFields filled, out FreeDPacket packet, out bool isReceiving))
         {
             receiving = false;
@@ -48,14 +51,28 @@ public class FreeDTracker : MonoBehaviour
     {
         bool hasRotation = (filled & FreeDFields.Rotation) != 0;
         bool hasPosition = (filled & FreeDFields.Position) != 0;
-        if ((filled & FreeDFields.Zoom) != 0) { zoomRaw = p.ZoomRaw; hasZoom = true; }
-        if ((filled & FreeDFields.Focus) != 0) { focusRaw = p.FocusRaw; hasFocus = true; }
+        if ((filled & FreeDFields.Zoom) != 0)
+        {
+            zoomRaw = p.ZoomRaw;
+            hasZoom = true;
+        }
+        if ((filled & FreeDFields.Focus) != 0)
+        {
+            focusRaw = p.FocusRaw;
+            hasFocus = true;
+        }
 
         float panDeg = (float)p.PanDegrees * rotationScale.x;
         float tiltDeg = (float)p.TiltDegrees * rotationScale.y;
         float rollDeg = (float)p.RollDegrees * rotationScale.z;
-        if (hasRotation) panTiltRollDeg = new Vector3(panDeg, tiltDeg, rollDeg);
-        if (hasPosition) positionMm = new Vector3((float)(p.XMeters * 1000), (float)(p.YMeters * 1000), (float)(p.ZMeters * 1000));
+        if (hasRotation)
+        {
+            panTiltRollDeg = new Vector3(panDeg, tiltDeg, rollDeg);
+        }
+        if (hasPosition)
+        {
+            positionMm = new Vector3((float)(p.XMeters * 1000), (float)(p.YMeters * 1000), (float)(p.ZMeters * 1000));
+        }
 
         // retroloc 座標 (X右 Y前 Z上) の姿勢。AngleAxis は数値的に標準の回転なので、そのまま合成できる。
         // 回転を担当する Receiver がないときは p の角度が 0 なので、単位回転になる。
@@ -65,8 +82,14 @@ public class FreeDTracker : MonoBehaviour
         // Unity 座標へ変換してから、Unity のカメラのローカル軸でオフセットを適用する
         Vector3 uPos = new Vector3(pos.x, pos.z, pos.y);
         Quaternion uRot = new Quaternion(-q.x, -q.z, -q.y, q.w);
-        if (hasPosition) transform.localPosition = uPos + uRot * positionOffset;
-        if (hasRotation) transform.localRotation = uRot * Quaternion.Euler(rotationOffset);
+        if (hasPosition)
+        {
+            transform.localPosition = uPos + uRot * positionOffset;
+        }
+        if (hasRotation)
+        {
+            transform.localRotation = uRot * Quaternion.Euler(rotationOffset);
+        }
     }
 
     private static Quaternion Rot(float pan, float tilt, float roll)

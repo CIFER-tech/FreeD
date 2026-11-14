@@ -51,5 +51,8 @@ public class FreeDManagerEditor : Editor
     }
 
     // 状態は再生中に変わり続けるので、選んでいる間は描き直す。
-    public override bool RequiresConstantRepaint() { return Application.isPlaying; }
+    public override bool RequiresConstantRepaint()
+    {
+        return Application.isPlaying;
+    }
 }

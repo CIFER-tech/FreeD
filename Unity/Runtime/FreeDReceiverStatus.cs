@@ -25,12 +25,18 @@ public class FreeDReceiverStatus
         {
             double intervalMs = nowMs - _lastReceivedMs;
             _sumIntervalMs += intervalMs;
-            if (intervalMs > _maxIntervalMsSoFar) _maxIntervalMsSoFar = intervalMs;
+            if (intervalMs > _maxIntervalMsSoFar)
+            {
+                _maxIntervalMsSoFar = intervalMs;
+            }
         }
         _lastReceivedMs = nowMs;
     }
 
-    internal void UpdateIsReceiving(double nowMs) { isReceiving = nowMs - _lastReceivedMs < TimeoutMs; }
+    internal void UpdateIsReceiving(double nowMs)
+    {
+        isReceiving = nowMs - _lastReceivedMs < TimeoutMs;
+    }
 
     /// <summary>1 秒ぶんの受信間隔を出して、集計をやり直す。</summary>
     internal void PublishRates(float elapsedSeconds)
