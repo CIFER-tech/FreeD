@@ -51,17 +51,16 @@ namespace CIFER.tech.FreeD.Unity
 
             foreach (var receiver in receivers)
             {
-                if (!receiver.TryTakeLatest(out var packet))
+                // 1 つのポートに複数のカメラ ID が届くので、遅延を過ぎたパケットを古い順にすべて合成する。
+                while (receiver.TryTakeNext(out var packet))
                 {
-                    continue;
+                    var cameraId = packet.packet.CameraId;
+                    mergedPackets.TryGetValue(cameraId, out var mergedPacket);
+
+                    // この Receiver の担当項目だけを新しい値にし、残りは今までの値を保つ。
+                    mergedPackets[cameraId] =
+                        FreeDMerger.Merge(mergedPacket, ~receiver.Field, packet.packet, receiver.Field);
                 }
-
-                var cameraId = packet.packet.CameraId;
-                mergedPackets.TryGetValue(cameraId, out var mergedPacket);
-
-                // この Receiver の担当項目だけを新しい値にし、残りは今までの値を保つ。
-                mergedPackets[cameraId] =
-                    FreeDMerger.Merge(mergedPacket, ~receiver.Field, packet.packet, receiver.Field);
             }
 
             foreach (var tracker in trackers)

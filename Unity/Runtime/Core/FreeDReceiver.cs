@@ -17,7 +17,7 @@ namespace CIFER.tech.FreeD.Core
         private const int DatagramBufferSize = 64;
 
         private float delaySec;
-        // 受信スレッドで起きた例外。スレッドの外へは投げられないので、TryTakeLatest で投げる。
+        // 受信スレッドで起きた例外。スレッドの外へは投げられないので、TryTakeNext で投げる。
         private volatile Exception? receiveException;
         private RingBuffer<FreeDReceivedPacket>? buffer;
         private Socket? socket;
@@ -103,9 +103,9 @@ namespace CIFER.tech.FreeD.Core
             }
         }
 
-        /// <summary>遅延を過ぎたパケットのうち、最も新しい 1 つを取り出す。なければ false。</summary>
+        /// <summary>遅延を過ぎたパケットのうち、最も古い 1 つを取り出す。なければ false。</summary>
         /// <exception cref="InvalidOperationException">受信が途中で失敗して止まったとき。1 回だけ投げる。</exception>
-        public bool TryTakeLatest(out FreeDReceivedPacket received)
+        public bool TryTakeNext(out FreeDReceivedPacket received)
         {
             received = default;
 
@@ -121,15 +121,13 @@ namespace CIFER.tech.FreeD.Core
                 return false;
             }
 
-            var hasReceived = false;
             var delayedNowMs = FreeDClock.NowMs - delaySec * 1000d;
-
-            while (buffer.TryPeek(out var peeked) && peeked.receivedMs <= delayedNowMs)
+            if (!buffer.TryPeek(out var peeked) || peeked.receivedMs > delayedNowMs)
             {
-                hasReceived = buffer.TryDequeue(out received);
+                return false;
             }
 
-            return hasReceived;
+            return buffer.TryDequeue(out received);
         }
     }
 }
