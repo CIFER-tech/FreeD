@@ -14,7 +14,7 @@ public class FreeDReceiverStatus
     [Tooltip("直近1秒の受信間隔 (ms)")]
     public float meanIntervalMs, maxIntervalMs;
 
-    // 受信タスクが書き、Update が読む。FreeDManager の _lock で守る。
+    // FreeDManager の Update だけが触る。
     [NonSerialized] private int _count;
     [NonSerialized] private double _sumIntervalMs, _maxIntervalMsSoFar, _lastReceivedMs = double.NegativeInfinity;
 

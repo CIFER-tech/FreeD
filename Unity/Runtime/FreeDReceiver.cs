@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -7,7 +8,7 @@ using FreeD;
 using UnityEngine;
 
 /// <summary>
-/// FreeD (UDP) をポート 1 つで受信して、パケットを FreeDManager に渡すだけ。ポートごとに 1 つ置く。
+/// FreeD (UDP) をポート 1 つで受信して、復号したパケットを保持するだけ。ポートごとに 1 つ置く。保持したパケットは、FreeDManager が毎フレーム取りに来る。
 /// 受信の開始・停止、合成、受信状態の集計はすべて FreeDManager が行う (FreeDManager がシーンになければ何も受信しない)。
 /// 姿勢は retroloc のポート 40000、ズームとフォーカスはレンズエンコーダのポート 41000、のように
 /// 送り元ごとに Receiver を置き、Fields でそのポートから使う項目を選ぶ。
@@ -28,6 +29,8 @@ public class FreeDReceiver : MonoBehaviour
     public float delayMs = 0f;
 
     private UdpClient _udp;
+    // 受信タスクが積み、FreeDManager が Update で取り出す。
+    private readonly ConcurrentQueue<FreeDReceivedPacket> _receivedPackets = new ConcurrentQueue<FreeDReceivedPacket>();
     private Task _receiveTask;
     private CancellationTokenSource _cancellation;
 
@@ -62,8 +65,8 @@ public class FreeDReceiver : MonoBehaviour
         }
     }
 
-    /// <summary>FreeDManager が呼ぶ。受信を始め、パケットが届くたびに onPacket を受信タスク (スレッドプール) から呼ぶ。</summary>
-    internal void Open(Action<FreeDReceiver, FreeDPacket> onPacket)
+    /// <summary>FreeDManager が呼ぶ。受信を始める。復号したパケットは、受信タスクが保持し、Manager が毎フレーム取りに来る。</summary>
+    internal void Open()
     {
         try
         {
@@ -78,7 +81,13 @@ public class FreeDReceiver : MonoBehaviour
         _cancellation = new CancellationTokenSource();
         UdpClient udp = _udp;
         CancellationToken token = _cancellation.Token;
-        _receiveTask = Task.Run(() => ReceiveLoopAsync(udp, onPacket, token));
+        _receiveTask = Task.Run(() => ReceiveLoopAsync(udp, token));
+    }
+
+    /// <summary>FreeDManager が毎フレーム呼ぶ。受信して復号したパケットを、届いた順に 1 つずつ取り出す。</summary>
+    internal bool TryDequeue(out FreeDReceivedPacket received)
+    {
+        return _receivedPackets.TryDequeue(out received);
     }
 
     /// <summary>FreeDManager が呼ぶ。受信を止めてポートを閉じる。</summary>
@@ -101,9 +110,12 @@ public class FreeDReceiver : MonoBehaviour
         _udp = null;
         _receiveTask = null;
         _cancellation = null;
+        while (_receivedPackets.TryDequeue(out FreeDReceivedPacket _))
+        {
+        }
     }
 
-    private async Task ReceiveLoopAsync(UdpClient udp, Action<FreeDReceiver, FreeDPacket> onPacket, CancellationToken token)
+    private async Task ReceiveLoopAsync(UdpClient udp, CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
@@ -124,9 +136,9 @@ public class FreeDReceiver : MonoBehaviour
             {
                 continue;
             }
-            if (FreeDCodec.TryDecode(result.Buffer, out FreeDPacket p))
+            if (FreeDCodec.TryDecode(result.Buffer, out FreeDPacket packet))
             {
-                onPacket(this, p);
+                _receivedPackets.Enqueue(new FreeDReceivedPacket { packet = packet, receivedMs = FreeDClock.NowMs });
             }
         }
     }
