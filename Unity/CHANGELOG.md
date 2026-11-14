@@ -1,13 +1,18 @@
 # Changelog
 
-## [1.3.1] - 2026-11-14
+## [2.0.0] - 2026-11-14
 
-- `FreeDReceiver` のストリームで、使う項目を 4 つのチェックボックスから、複数選べるドロップダウン (`fields`) に変更。1.3.0 までのシーンのチェックは自動で移る。
-- 状態の欄を、編集できない表示だけの欄にした (Editor 用のアセンブリ `FreeD.Unity.Editor` を追加)。`FreeDReceiver`・各ストリーム・`FreeDLens` の状態の欄は、枠で囲んでまとめた (見出しは付けない)。
-- `panSign` / `tiltSign` / `rollSign` を、ストリームごとの `rotationScale` (Vector3。X=パン, Y=チルト, Z=ロール) に変更。符号ではなく倍率としてかけているので名前も改めた。1.3.0 までのシーンの値は、回転を使うストリームへ自動で移る。
-- `positionOffset` / `rotationOffset` を、ストリームごとの設定に移した。位置を使うストリームの `positionOffset` と、回転を使うストリームの `rotationOffset` が効く。1.3.0 までのシーンの値は、それらのストリームへ自動で移る。
-- `FreeDOrigin` を廃止し、`FreeDReceiver` を付けたオブジェクトが原点になるようにした。カメラはその子にして、`FreeDReceiver` の `cameraTransform` に入れる。`FreeDLens` は、カメラに付け、親の `FreeDReceiver` から値を受け取る。1.3.0 までのシーンは、手で組み直す必要がある (`FreeDReceiver` を原点のオブジェクトへ移し、`cameraTransform` にカメラを入れる)。
-- `FreeDReceiver` の `pan`/`tilt`/`roll` と `xMm`/`yMm`/`zMm` を、`panTiltRollDeg` と `positionMm` (どちらも Vector3) にまとめた。`zoomRaw` を `hasZoom` の下、`focusRaw` を `hasFocus` の下に並べた。
+互換性のない変更。1.3.0 までのシーンは組み直しが必要 (手順は README)。
+
+- `FreeDReceiver` を、受信・合成・反映をすべて持つ形から、3 つのコンポーネントに分けた。
+  - `FreeDManager` (新規): 受信の開始・停止と、カメラ ID ごとの合成を管理する。シーンになければ、受信も反映も行われない。
+  - `FreeDReceiver`: ポート 1 つで受信するだけ。ポートごとに置き、使う項目 (`fields`) と遅延 (`delayMs`) を持つ。`streams` は廃止。
+  - `FreeDTracker` (新規): `cameraId` を指定して値を受け取り、自分のオブジェクトの位置・向きに反映する。`rotationScale` (旧 `panSign` / `tiltSign` / `rollSign`。符号ではなく倍率としてかけているので改名)・`positionOffset` / `rotationOffset` を持つ。
+- `FreeDOrigin` を廃止。`FreeDTracker` の親のオブジェクトが原点になる。親の Position と Rotation の Y で、原点の位置と向きを決める。
+- `FreeDLens` を、`FreeDTracker` と同じオブジェクトに付ける形にした。
+- 使う項目を、4 つのチェックボックスから、複数選べるドロップダウン (`FreeDFields`) に変更。並びは Position・Rotation・Zoom・Focus。
+- 状態の欄を、編集できない表示だけの欄にし、枠で囲んだ (Editor 用のアセンブリ `FreeD.Unity.Editor` を追加)。`pan`/`tilt`/`roll` と `xMm`/`yMm`/`zMm` は、Vector3 の `panTiltRollDeg` と `positionMm` にまとめた。
+- 再生中の左上の表示 (OnGUI) を廃止。状態は Inspector で見る。
 
 ## [1.3.0] - 2026-10-30
 

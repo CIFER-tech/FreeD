@@ -65,13 +65,13 @@ FreeDFields filled = merger.Update(nowMs, out FreeDPacket merged);  // filled �
 - 同じ項目を 2 つのストリームが担当すると、コンストラクタが `ArgumentException` を投げる。
 - 項目ごとに、担当するストリームで最後に届いた値を保つ。途切れたかどうかは `IsReceiving(streamIndex, nowMs)`。
 - スレッドに対して安全ではない。受信スレッドと更新スレッドが別なら、呼び出し側でロックする。
-- Unity では `FreeDReceiver` が使っている ([`Unity/`](Unity) 参照)。
+- Unity では `FreeDManager`・`FreeDReceiver`・`FreeDTracker` が使っている ([`Unity/`](Unity) 参照)。
 
 ## Unity で原点を合わせる
 
-`FreeDReceiver` を付けた空のオブジェクトが「retroloc の原点が Unity のどこにあるか」になる。カメラはその子にして、`Camera Transform` に入れる。Position と Rotation の Y に原点の位置と水平の向きを入れる (青い矢印 = retroloc の Y、赤い矢印 = X)。
+`FreeDTracker` を付けたカメラの親のオブジェクトが「retroloc の原点が Unity のどこにあるか」になる。親の Position と Rotation の Y に、原点の位置と水平の向きを入れる (青い矢印 = retroloc の Y、赤い矢印 = X)。
 
-- 吸収するのは位置 3 軸と水平の向きだけ。床は水平とみなすので、傾き (X・Z の回転) は 0 に保つ。
+- 吸収するのは位置 3 軸と水平の向きだけ。床は水平とみなすので、親の傾き (X・Z の回転) は 0 にする。
 
 ## ビルドとテスト
 

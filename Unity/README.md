@@ -33,29 +33,35 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 
 詳しいメッセージ配置・仕様の注意点はリポジトリ直下の [README](../README.md) を参照。
 
-## 受信コンポーネント (FreeDReceiver)
+## 受信コンポーネント (FreeDManager・FreeDReceiver・FreeDTracker)
 
-空のオブジェクトに `FreeDReceiver` を付け、カメラをその子にすると、UDP で受信した FreeD がカメラの位置・向きに反映される。`FreeDReceiver` を付けたオブジェクトが retroloc の原点になる。
+3 つのコンポーネントに分かれている。
 
-1. パッケージを入れ、空のオブジェクトに `FreeDReceiver` を追加する。カメラをその子にして、`Camera Transform` に入れる。
-2. `FreeDReceiver` のオブジェクトの Position と Rotation の Y を、retroloc の原点にあたる Unity 上の場所と向きに合わせる (Scene ビューの青い矢印 = retroloc の Y、赤い矢印 = X)。床は水平とみなすので、傾き (X・Z の回転) は 0 に保たれる。
-3. `Streams` の 1 本目の `Port` を retroloc の「FreeD送信」のポート (既定 40000) に合わせる。
-4. 再生すると、左上に受信状態・位置 (mm)・角度 (°) が出る。
-5. 向きが逆なら、そのストリームの `Rotation Scale` の該当する軸 (X=パン, Y=チルト, Z=ロール) を -1 にする。カメラ取り付けのずれは、そのストリームの `Position Offset` / `Rotation Offset` で合わせる (どちらも Unity の座標・向きで指定。カメラのローカル軸: 右・上・前、回転は Transform の Rotation と同じ)。
+- `FreeDManager`: シーンに 1 つ置く。受信の開始・停止と、カメラ ID ごとの合成をすべて管理する。シーンになければ、受信も反映も行われない。
+- `FreeDReceiver`: ポート 1 つで受信するだけ。送信元のポートごとに 1 つ置く。
+- `FreeDTracker`: カメラ ID を指定して値を受け取り、自分のオブジェクトの位置・向きに反映する。親のオブジェクトが retroloc の原点になる。
+
+1. パッケージを入れ、空のオブジェクトに `FreeDManager` を追加する。
+2. 空のオブジェクト (Manager の子でもよい) に `FreeDReceiver` を追加し、`Port` を retroloc の「FreeD送信」のポート (既定 40000) に合わせる。
+3. 空のオブジェクトを 1 つ作り、retroloc の原点にあたる Unity 上の場所と向きに合わせる (Position と Rotation の Y)。Scene ビューの青い矢印 = retroloc の Y、赤い矢印 = X。床は水平とみなすので、Rotation の X・Z は 0 にする。
+4. その子に Unity のカメラを置き、`FreeDTracker` を追加する。`Camera Id` を送信側のカメラ ID (retroloc は既定 1) に合わせる。
+5. 再生すると、Receiver と Tracker の Inspector に受信状態・位置 (mm)・角度 (°) が出る。
+6. 向きが逆なら、`Rotation Scale` の該当する軸 (X=パン, Y=チルト, Z=ロール) を -1 にする。カメラ取り付けのずれは `Position Offset` / `Rotation Offset` で合わせる (どちらも Unity の座標・向きで指定。カメラのローカル軸: 右・上・前、回転は Transform の Rotation と同じ)。
 
 座標は retroloc のワールド (X=右, Y=前, Z=上, m) から Unity へ `(x, y, z) → (x, z, y)` で変換する。
 
-### 複数のストリームを合成する (姿勢 + レンズ)
+### 複数のポートを合成する (姿勢 + レンズ)
 
-姿勢は retroloc、ズームとフォーカスは別のシステム、のように別々の FreeD ストリームで届くときは、`Streams` にストリームを足して、ポートごとに使う項目を選ぶ。
+姿勢は retroloc、ズームとフォーカスは別のシステム、のように別々のポートで届くときは、`FreeDReceiver` をポートごとに置き、使う項目を選ぶ。
 
-1. `Streams` を 2 本にする。1 本目: `Port` 40000、`Fields` で `Rotation` と `Position` だけ選ぶ。2 本目: `Port` 41000、`Fields` で `Zoom` と `Focus` だけ選ぶ。
-2. 同じ項目は 1 つのストリームだけが使える。選ぶと、他のストリームの選択が外れる。
-3. 項目ごとに、そのストリームで最後に届いた値を使う。途切れても値は保たれ、左上の表示でそのストリームが「途切れ」になる。
-4. 映像とのずれは、早く届く側のストリームの `Delay Ms` で合わせる (その分だけ反映を遅らせる)。
-5. ズームとフォーカスの生の値 (24bit) は `zoomRaw` / `focusRaw` に出る。カメラに反映するには、カメラに `FreeDLens` を付け、AnimationCurve に対応を入れる (横軸 = 生の値、縦軸 = 焦点距離 mm / ピント距離 m)。焦点距離は Physical Camera に入る。ピント距離は Unity 2022.2 以降で `Camera.focusDistance` にも入り、`FreeDLens.focusDistanceM` からも読める。
+1. `FreeDReceiver` を 2 つ置く。1 つ目: `Port` 40000、`Fields` で `Position` と `Rotation` だけ選ぶ。2 つ目: `Port` 41000、`Fields` で `Zoom` と `Focus` だけ選ぶ。
+2. 同じ項目は 1 つの Receiver だけが使える。選ぶと、他の Receiver の選択が外れる。
+3. 項目ごとに、その Receiver で最後に届いた値を使う。途切れても値は保たれ、Receiver の `Receiving` が false になる。
+4. 映像とのずれは、早く届く側の Receiver の `Delay Ms` で合わせる (その分だけ反映を遅らせる)。
+5. 合成はカメラ ID ごとに行う。姿勢とレンズを 1 台のカメラにまとめるには、どちらのシステムも同じカメラ ID で送る。
+6. ズームとフォーカスの生の値 (24bit) は `FreeDTracker` の `zoomRaw` / `focusRaw` に出る。カメラに反映するには、Tracker と同じオブジェクトに `FreeDLens` を付け、AnimationCurve に対応を入れる (横軸 = 生の値、縦軸 = 焦点距離 mm / ピント距離 m)。焦点距離は Physical Camera に入る。ピント距離は Unity 2022.2 以降で `Camera.focusDistance` にも入り、`FreeDLens.focusDistanceM` からも読める。
 
-1.2 までのシーンの `port` / `cameraId` は、読み込むと `Streams` の 1 本目に移る。
+2.0.0 より前のシーン (カメラに `FreeDReceiver` を付けていたもの) は、上の手順で組み直す。
 
 ## DLL の更新について
 
