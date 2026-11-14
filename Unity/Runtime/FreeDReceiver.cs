@@ -86,11 +86,12 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
 
     [Header("状態 (読み取り専用)")]
     [FreeDReadOnly] public bool receiving;
-    [FreeDReadOnly] public double pan, tilt, roll;
-    [FreeDReadOnly] public double xMm, yMm, zMm;
-    [Tooltip("ズーム・フォーカスのエンコーダの生の値 (24bit)。FreeDLens が焦点距離とピント距離に直す")]
-    [FreeDReadOnly] public uint zoomRaw, focusRaw;
-    [FreeDReadOnly] public bool hasZoom, hasFocus;
+    [Tooltip("度。X=パン, Y=チルト, Z=ロール"), FreeDReadOnly] public Vector3 panTiltRollDeg;
+    [Tooltip("mm。FreeD 座標 (X=右, Y=前, Z=上)"), FreeDReadOnly] public Vector3 positionMm;
+    [FreeDReadOnly] public bool hasZoom;
+    [Tooltip("ズームのエンコーダの生の値 (24bit)。FreeDLens が焦点距離に直す"), FreeDReadOnly] public uint zoomRaw;
+    [FreeDReadOnly] public bool hasFocus;
+    [Tooltip("フォーカスのエンコーダの生の値 (24bit)。FreeDLens がピント距離に直す"), FreeDReadOnly] public uint focusRaw;
 
     // 1.2 までの設定 (ストリームが 1 本だけだった)。読み込んだときに streams の 1 本目へ移す。
     [SerializeField, HideInInspector, FormerlySerializedAs("port")] private int _legacyPort = -1;
@@ -273,8 +274,8 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
     {
         bool hasRotation = (filled & FreeDFields.Rotation) != 0;
         bool hasPosition = (filled & FreeDFields.Position) != 0;
-        if (hasRotation) { pan = p.PanDegrees; tilt = p.TiltDegrees; roll = p.RollDegrees; }
-        if (hasPosition) { xMm = p.XMeters * 1000; yMm = p.YMeters * 1000; zMm = p.ZMeters * 1000; }
+        if (hasRotation) { panTiltRollDeg = new Vector3((float)p.PanDegrees, (float)p.TiltDegrees, (float)p.RollDegrees); }
+        if (hasPosition) { positionMm = new Vector3((float)(p.XMeters * 1000), (float)(p.YMeters * 1000), (float)(p.ZMeters * 1000)); }
 
         // retroloc 座標 (X右 Y前 Z上) の姿勢。AngleAxis は数値的に標準の回転なので、そのまま合成できる。
         // 回転のストリームがないときは p の角度が 0 なので、単位回転になる。
@@ -304,7 +305,7 @@ public class FreeDReceiver : MonoBehaviour, ISerializationCallbackReceiver
             text.AppendFormat("  :{0} {1} {2} pkt/s  間隔 平均{3:F1} 最大{4:F1} ms\n",
                 s.port, s.receiving ? "受信中" : "途切れ", s.packetsPerSecond, s.meanIntervalMs, s.maxIntervalMs);
         }
-        text.AppendFormat("位置 mm {0:F1} {1:F1} {2:F1}\n角度 ° {3:F2} {4:F2} {5:F2}\n", xMm, yMm, zMm, pan, tilt, roll);
+        text.AppendFormat("位置 mm {0:F1} {1:F1} {2:F1}\n角度 ° {3:F2} {4:F2} {5:F2}\n", positionMm.x, positionMm.y, positionMm.z, panTiltRollDeg.x, panTiltRollDeg.y, panTiltRollDeg.z);
         text.AppendFormat("ズーム {0}  フォーカス {1}", hasZoom ? zoomRaw.ToString() : "-", hasFocus ? focusRaw.ToString() : "-");
         GUI.Label(new Rect(10, 10, 460, 40 + 18 * streams.Count), text.ToString());
     }
