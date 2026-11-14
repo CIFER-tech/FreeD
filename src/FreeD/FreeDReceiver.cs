@@ -3,10 +3,9 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using CIFER.tech.FreeD.Core;
 using CIFER.tech.RingBuffer;
 
-namespace CIFER.tech.FreeD.Unity
+namespace CIFER.tech.FreeD.Core
 {
     public sealed class FreeDReceiver : IDisposable
     {

@@ -1,15 +1,14 @@
 {
     "name": "CIFER.tech.FreeD.Unity",
     "rootNamespace": "CIFER.tech.FreeD.Unity",
-    "references": [
-        "CIFER.tech.RingBuffer"
-    ],
+    "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,
     "precompiledReferences": [
-        "CIFER.tech.FreeD.Core.dll"
+        "CIFER.tech.FreeD.Core.dll",
+        "CIFER.tech.RingBuffer.dll"
     ],
     "autoReferenced": true,
     "defineConstraints": [],

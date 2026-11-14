@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace CIFER.tech.FreeD.Unity
+namespace CIFER.tech.FreeD.Core
 {
     /// <summary>
     /// FreeD の受信時刻と、合成の時刻をそろえる時計。
