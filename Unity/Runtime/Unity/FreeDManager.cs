@@ -53,6 +53,8 @@ namespace CIFER.tech.FreeD.Unity
 
         private void Update()
         {
+            CloseDestroyedReceivers();
+
             if (HasOverlappedField())
             {
                 return;
@@ -83,6 +85,22 @@ namespace CIFER.tech.FreeD.Unity
                 {
                     tracker.Apply(mergedPacket);
                 }
+            }
+        }
+
+        /// <summary>シーンのアンロードなどで壊された Receiver は、受信を止めて、一覧から外す。</summary>
+        private void CloseDestroyedReceivers()
+        {
+            for (var i = receivers.Count - 1; i >= 0; i--)
+            {
+                var receiver = receivers[i];
+                if (receiver != null)
+                {
+                    continue;
+                }
+
+                receiver.Close();
+                receivers.RemoveAt(i);
             }
         }
 
