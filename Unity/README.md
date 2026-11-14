@@ -34,7 +34,7 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 
 ## 必要なパッケージ
 
-受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) を使う。`Packages/manifest.json` の `dependencies` に足しておく (FreeD と同じ置き方なら、次のとおり)。
+受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) (4.0.0 以降。ビルドした DLL を同梱している) を使う。`Packages/manifest.json` の `dependencies` に足しておく (FreeD と同じ置き方なら、次のとおり)。
 
 ```json
 "tech.cifer.ringbuffer": "file:../../../RingBuffer/Unity"
@@ -81,8 +81,8 @@ Model と View は、Unity の `Awake`・`OnEnable`・`Update` などを使わ�
 
 ## ソースの置き場所について
 
-符号化・復号・合成のソースは [`src/FreeD`](../src/FreeD) にあり、ビルドした `Runtime/CIFER.tech.FreeD.Core.dll` を同梱している。`main` に `src/FreeD` の変更が入ると、GitHub Actions が DLL を作り直して、この場所へコミットする。
-受信とコンポーネントのソースは `Runtime/` にあり、アセンブリ `CIFER.tech.FreeD.Unity` が DLL を参照する。
+符号化・復号・合成と受信 (`FreeDReceiver`) のソースは [`src/FreeD`](../src/FreeD) にあり、ビルドした `Runtime/CIFER.tech.FreeD.Core.dll` を同梱している。`main` に `src/FreeD` の変更が入ると、GitHub Actions が DLL を作り直して、この場所へコミットする。
+コンポーネントのソースは `Runtime/` にあり、アセンブリ `CIFER.tech.FreeD.Unity` が、FreeD と RingBuffer の 2 つの DLL を参照する。
 
 ```
 dotnet test

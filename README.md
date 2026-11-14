@@ -1,7 +1,7 @@
 # FreeD
 
 FreeD (D1, 29 バイト) メッセージの符号化・復号ライブラリ (C#, netstandard2.1)。
-普通の .NET アプリからも、Unity (2021.2+) のパッケージ (`Unity/`) からも、同じソースで使える。Unity のパッケージには、このソースをビルドした DLL (`CIFER.tech.FreeD.Core.dll`) を同梱する。
+普通の .NET アプリからも、Unity (2021.2+) のパッケージ (`Unity/`) からも、同じ DLL (`CIFER.tech.FreeD.Core.dll`) で使える。Unity のパッケージには、ビルドした DLL を同梱する。
 
 Unity からは Package Manager 経由でも導入できる ([`Unity/`](Unity) 参照、UPM パッケージ `tech.cifer.freed`)。
 Unity のパッケージは、受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) を使う (`Packages/manifest.json` に足す。手順は [`Unity/README.md`](Unity/README.md))。
@@ -68,13 +68,17 @@ FreeDPacket merged = FreeDMerger.Merge(
 
 ## 普通の .NET アプリで使う
 
-符号化・復号・合成のソースは `src/FreeD/` にある (netstandard2.1、名前空間は `CIFER.tech.FreeD.Core`)。使うプロジェクトの `.csproj` から、プロジェクトを参照する。
+ソースは `src/FreeD/` にある (netstandard2.1、名前空間は `CIFER.tech.FreeD.Core`)。符号化・復号・合成と、UDP の受信 (`FreeDReceiver`) を持つ。受信は RingBuffer ([`CIFER.tech.RingBuffer`](https://github.com/CIFER-tech/RingBuffer)) を使う。
+
+タグ (`v*`) を付けると、GitHub Actions が `.nupkg` を作って、GitHub の Releases に添付する。nuget.org には公開しない。取り出した `.nupkg` を置いたフォルダを、NuGet のローカルのソースにして使う (RingBuffer の `.nupkg` も同じ方法で取り出す)。
+
+プロジェクトを直接参照することもできる。
 
 ```xml
 <ProjectReference Include="..\FreeD\src\FreeD\FreeD.csproj" />
 ```
 
-受信 (`FreeDReceiver`) と Unity のコンポーネントは、Unity のパッケージ (`Unity/`) にある。
+RingBuffer のリポジトリは、FreeD の隣に置く。別の場所に置くときは、`-p:RingBufferProject=パス` で変える。
 
 ## ビルドとテスト
 
