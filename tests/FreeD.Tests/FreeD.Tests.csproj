@@ -15,10 +15,8 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
 
-  <!-- ソースは Unity パッケージ (Unity/Runtime/Core) に置いたままで、テストが直接コンパイルする。DLL は作らない -->
-  <ItemGroup>
-    <Compile Include="..\..\Unity\Runtime\Core\**\*.cs" />
-  </ItemGroup>
+  <!-- ソースは Unity パッケージ (Unity/Runtime/Core) に置いたままで、DLL を作らずに取り込む -->
+  <Import Project="..\..\FreeD.Core.props" />
 
   <!-- FreeDReceiver が使う。RingBuffer のリポジトリを、このリポジトリの隣に置く -->
   <ItemGroup>

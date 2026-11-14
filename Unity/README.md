@@ -82,7 +82,7 @@ Model と View は、Unity の `Awake`・`OnEnable`・`Update` などを使わ�
 ## ソースの置き場所について
 
 符号化・復号・合成のソースは `Runtime/Core/` にあり、Unity では Unity に依存しないアセンブリ `CIFER.tech.FreeD.Core` としてコンパイルされる (DLL は同梱しない)。コンポーネントは `Runtime/Unity/` にあり、アセンブリ `CIFER.tech.FreeD.Unity` が Core を参照する。
-`src/FreeD/FreeD.csproj` は同じソースを取り込んで、.NET のアプリとテストから使えるようにしている。
+リポジトリ直下の `FreeD.Core.props` は同じソースを取り込んで、DLL を作らずに、普通の .NET アプリとテストから使えるようにしている (手順は [README](../README.md))。
 
 ```
 dotnet test

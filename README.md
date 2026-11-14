@@ -1,7 +1,7 @@
 # FreeD
 
 FreeD (D1, 29 バイト) メッセージの符号化・復号ライブラリ (C#, netstandard2.1)。
-.NET 8 のアプリからも、Unity (2021.2+) のパッケージ (`Unity/`) からも、同じソースで使える。
+普通の .NET アプリからも、Unity (2021.2+) のパッケージ (`Unity/`) からも、DLL を作らずに、同じソースで使える。
 
 Unity からは Package Manager 経由でも導入できる ([`Unity/`](Unity) 参照、UPM パッケージ `tech.cifer.freed`)。
 Unity のパッケージは、受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) を使う (`Packages/manifest.json` に足す。手順は [`Unity/README.md`](Unity/README.md))。
@@ -65,6 +65,22 @@ FreeDPacket merged = FreeDMerger.Merge(
 `FreeDTracker` を付けたカメラの親のオブジェクトが、「FreeD 座標の原点が Unity のどこにあるか」になる。親の Position と Rotation の Y に、原点の位置と水平の向きを入れる (青い矢印 = FreeD の Y、赤い矢印 = X)。
 
 - 吸収するのは位置 3 軸と水平の向きだけ。床は水平とみなすので、親の傾き (X・Z の回転) は 0 にする。
+
+## 普通の .NET アプリで使う
+
+ソースは `Unity/Runtime/Core/` にある。DLL は作らず、使うプロジェクトの `.csproj` から、リポジトリ直下の `FreeD.Core.props` を取り込む。
+
+```xml
+<Import Project="..\FreeD\FreeD.Core.props" />
+
+<ItemGroup>
+  <!-- FreeDReceiver が使う。RingBuffer のリポジトリを、FreeD の隣に置く -->
+  <ProjectReference Include="..\RingBuffer\src\RingBuffer\RingBuffer.csproj" />
+</ItemGroup>
+```
+
+- ソースは netstandard2.1 以降で、`#nullable enable` で書いてある。
+- 名前空間は `CIFER.tech.FreeD.Core`。
 
 ## ビルドとテスト
 
