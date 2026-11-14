@@ -12,48 +12,44 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class FreeDManager : MonoBehaviour
 {
-    // 無効なものも含む。あとで有効になったら、受信を開き直す。
-    private readonly List<FreeDReceiver> _sceneReceivers = new List<FreeDReceiver>();
-    private readonly List<FreeDTracker> _sceneTrackers = new List<FreeDTracker>();
+    private readonly FreeDReceiverGroup _receivers = new FreeDReceiverGroup();
 
-    // 受信を開いた Receiver と、開いたときの使う項目。添字が FreeDMerger のストリームの番号になる。
-    private readonly List<FreeDReceiver> _openedReceivers = new List<FreeDReceiver>();
-    private readonly List<FreeDFields> _fieldsPerStream = new List<FreeDFields>();
+    // 無効なものも含む。
+    private readonly List<FreeDTracker> _sceneTrackers = new List<FreeDTracker>();
 
     private readonly Dictionary<int, FreeDMerger> _mergersByCameraId = new Dictionary<int, FreeDMerger>();
     // 値が 1 つも入っていない ID は入れない (Tracker に渡さない)。
     private readonly Dictionary<int, FreeDPacket> _mergedPacketsByCameraId = new Dictionary<int, FreeDPacket>();
 
-    private int _openedSettingsHash;
-
     private void OnEnable()
     {
-        OpenReceivers();
+        StartReceiving();
     }
 
     private void OnDisable()
     {
-        CloseReceivers();
+        StopReceiving();
     }
 
     private void Update()
     {
-        if (ReceiverSettingsHash() != _openedSettingsHash)
+        if (_receivers.IsSettingsChanged)
         {
-            CloseReceivers();
-            OpenReceivers();
+            StopReceiving();
+            StartReceiving();
         }
 
-        for (int streamIndex = 0; streamIndex < _openedReceivers.Count; streamIndex++)
+        for (int streamIndex = 0; streamIndex < _receivers.OpenedCount; streamIndex++)
         {
-            while (_openedReceivers[streamIndex].TryDequeue(out FreeDReceivedPacket received))
+            while (_receivers.GetOpened(streamIndex).TryDequeue(out FreeDReceivedPacket received))
             {
                 int cameraId = received.packet.CameraId;
                 if (!_mergersByCameraId.TryGetValue(cameraId, out FreeDMerger merger))
                 {
-                    merger = new FreeDMerger(_fieldsPerStream);
+                    merger = new FreeDMerger(_receivers.OpenedFields);
                     _mergersByCameraId.Add(cameraId, merger);
                 }
+
                 merger.Put(streamIndex, received.packet, received.receivedMs);
             }
         }
@@ -63,10 +59,11 @@ public class FreeDManager : MonoBehaviour
         {
             FreeDMerger merger = cameraIdAndMerger.Value;
             // delayMs は再生中に Inspector で変えられるので、毎フレーム渡す。
-            for (int streamIndex = 0; streamIndex < _openedReceivers.Count; streamIndex++)
+            for (int streamIndex = 0; streamIndex < _receivers.OpenedCount; streamIndex++)
             {
-                merger.SetDelay(streamIndex, _openedReceivers[streamIndex].delayMs);
+                merger.SetDelay(streamIndex, _receivers.GetOpened(streamIndex).delayMs);
             }
+
             FreeDFields filledFields = merger.Update(nowMs, out FreeDPacket merged);
             if (filledFields != FreeDFields.None)
             {
@@ -80,6 +77,7 @@ public class FreeDManager : MonoBehaviour
             {
                 continue;
             }
+
             if (_mergedPacketsByCameraId.TryGetValue(tracker.cameraId, out FreeDPacket merged))
             {
                 tracker.Apply(merged);
@@ -87,73 +85,21 @@ public class FreeDManager : MonoBehaviour
         }
     }
 
-    private void OpenReceivers()
+    private void StartReceiving()
     {
-        _sceneReceivers.Clear();
         _sceneTrackers.Clear();
 #if UNITY_2022_2_OR_NEWER
-        _sceneReceivers.AddRange(FindObjectsByType<FreeDReceiver>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
         _sceneTrackers.AddRange(FindObjectsByType<FreeDTracker>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
 #else
-        _sceneReceivers.AddRange(FindObjectsOfType<FreeDReceiver>(true));
         _sceneTrackers.AddRange(FindObjectsOfType<FreeDTracker>(true));
 #endif
-        // 項目が重なって受信を始めないときも記録する。設定が直るまで、開き直さない。
-        _openedSettingsHash = ReceiverSettingsHash();
-
-        // FreeDMerger は同じ項目を 2 つのストリームが担当すると合成できないので、重なっていたら 1 つも開かない。
-        var claimedFields = FreeDFields.None;
-        foreach (FreeDReceiver receiver in _sceneReceivers)
-        {
-            if (!receiver.isActiveAndEnabled)
-            {
-                continue;
-            }
-            FreeDFields overlappedFields = claimedFields & receiver.UsedFields;
-            if (overlappedFields != FreeDFields.None)
-            {
-                Debug.LogError("FreeD: 同じ項目を複数の Receiver が担当している: " + overlappedFields, this);
-                _openedReceivers.Clear();
-                _fieldsPerStream.Clear();
-                return;
-            }
-            claimedFields |= receiver.UsedFields;
-            _openedReceivers.Add(receiver);
-            _fieldsPerStream.Add(receiver.UsedFields);
-        }
-
-        foreach (FreeDReceiver receiver in _openedReceivers)
-        {
-            receiver.Open();
-        }
+        _receivers.Open(this);
     }
 
-    private void CloseReceivers()
+    private void StopReceiving()
     {
-        foreach (FreeDReceiver receiver in _openedReceivers)
-        {
-            receiver.Close();
-        }
-        _openedReceivers.Clear();
-        _fieldsPerStream.Clear();
+        _receivers.Close();
         _mergersByCameraId.Clear();
         _mergedPacketsByCameraId.Clear();
-    }
-
-    /// <summary>Receiver の数・ポート・使う項目・有効か無効かのどれかが変わると、値が変わる。</summary>
-    private int ReceiverSettingsHash()
-    {
-        unchecked
-        {
-            int hash = _sceneReceivers.Count;
-            foreach (FreeDReceiver receiver in _sceneReceivers)
-            {
-                // 再生中に消された Receiver も、変化として扱う (開き直すときに、シーンから探し直す)。
-                bool isOpenable = receiver != null && receiver.isActiveAndEnabled;
-                hash = hash * 31 + receiver.port * 31 + (int)receiver.UsedFields;
-                hash = hash * 31 + (isOpenable ? 1 : 0);
-            }
-            return hash;
-        }
     }
 }
