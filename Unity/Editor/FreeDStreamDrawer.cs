@@ -8,7 +8,7 @@ public class FreeDStreamDrawer : PropertyDrawer
     static readonly string[] SettingNames = { "port", "cameraId", "fields", "delayMs" };
     static readonly string[] StatusNames = { "receiving", "packetsPerSecond", "meanIntervalMs", "maxIntervalMs" };
 
-    const float BoxPadding = 4f;
+    const float BoxPadding = 6f;
 
     static float LineHeight { get { return EditorGUIUtility.singleLineHeight; } }
     static float Spacing { get { return EditorGUIUtility.standardVerticalSpacing; } }
@@ -44,13 +44,18 @@ public class FreeDStreamDrawer : PropertyDrawer
             y = DrawField(position, y, property.FindPropertyRelative(name));
 
         y += Spacing;
-        var box = new Rect(position.x, y, position.width, StatusBoxHeight(property) );
-        GUI.Box(EditorGUI.IndentedRect(box), GUIContent.none, EditorStyles.helpBox);
-        y += BoxPadding;
-        EditorGUI.LabelField(new Rect(position.x, y, position.width, LineHeight), "状態", EditorStyles.boldLabel);
-        y += LineHeight + Spacing;
+        Rect box = EditorGUI.IndentedRect(new Rect(position.x, y, position.width, StatusBoxHeight(property)));
+        GUI.Box(box, GUIContent.none, EditorStyles.helpBox);
+
+        // 枠の内側に余白をとって描く。位置は枠に合わせて計算済みなので、字下げは 0 に戻す。
+        Rect inner = new Rect(box.x + BoxPadding, box.y + BoxPadding, box.width - BoxPadding * 2, box.height - BoxPadding * 2);
+        int savedIndentLevel = EditorGUI.indentLevel;
+        EditorGUI.indentLevel = 0;
+        EditorGUI.LabelField(new Rect(inner.x, inner.y, inner.width, LineHeight), "状態", EditorStyles.boldLabel);
+        float innerY = inner.y + LineHeight + Spacing;
         foreach (string name in StatusNames)
-            y = DrawField(position, y, property.FindPropertyRelative(name));
+            innerY = DrawField(inner, innerY, property.FindPropertyRelative(name));
+        EditorGUI.indentLevel = savedIndentLevel;
         EditorGUI.indentLevel--;
     }
 
