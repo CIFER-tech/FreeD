@@ -1,7 +1,7 @@
 using CIFER.tech.FreeD.Core;
 using Xunit;
 
-namespace FreeD.Tests;
+namespace CIFER.tech.FreeD.Tests;
 
 public class FreeDCodecTests
 {
