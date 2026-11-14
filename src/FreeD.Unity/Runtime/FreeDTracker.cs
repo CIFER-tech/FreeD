@@ -85,12 +85,18 @@ namespace CIFER.tech.FreeD.Unity
                 freeDRotation.w);
 
             // オフセットは Unity のカメラのローカル軸で適用する。
+            // 向きを担当する Receiver がないときは、今の向きから、向きのオフセットを除いたものを使う。
+            var isRotationClaimed = (claimedFields & FreeDField.Rotation) != 0;
+            var offsetRotation = isRotationClaimed
+                ? unityRotation
+                : transform.localRotation * Quaternion.Inverse(Quaternion.Euler(rotationOffset));
+
             if ((claimedFields & FreeDField.Position) != 0)
             {
-                transform.localPosition = unityPosition + unityRotation * positionOffset;
+                transform.localPosition = unityPosition + offsetRotation * positionOffset;
             }
 
-            if ((claimedFields & FreeDField.Rotation) != 0)
+            if (isRotationClaimed)
             {
                 transform.localRotation = unityRotation * Quaternion.Euler(rotationOffset);
             }
