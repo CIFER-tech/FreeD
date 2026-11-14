@@ -11,6 +11,9 @@ namespace CIFER.tech.FreeD.Unity
         private readonly List<FreeDReceiverForUnity> receivers = new();
         private readonly List<FreeDTracker> trackers = new();
 
+        // Receiver から取り出したパケットを受ける。毎回これを使い回す。
+        private readonly FreeDPacket receivedPacket = new FreeDPacket();
+
         // FreeD のカメラ ID は 1 バイトなので、全部を最初に作っておく。実行中は確保しない。
         private readonly FreeDMergedCamera[] mergedByCameraId = CreateMergedCameras();
 
@@ -53,7 +56,7 @@ namespace CIFER.tech.FreeD.Unity
 
             foreach (var merged in mergedByCameraId)
             {
-                merged.packet = default;
+                merged.packet.Clear();
                 merged.fields = FreeDField.None;
             }
 
@@ -73,12 +76,12 @@ namespace CIFER.tech.FreeD.Unity
             foreach (var receiver in receivers)
             {
                 // 1 つのポートに複数のカメラ ID が届くので、遅延を過ぎたパケットを古い順にすべて合成する。
-                while (receiver.TryTakeNext(out var packet))
+                while (receiver.TryTakeNext(receivedPacket))
                 {
-                    var merged = mergedByCameraId[packet.packet.CameraId];
+                    var merged = mergedByCameraId[receivedPacket.CameraId];
 
                     // この Receiver の担当項目だけを新しい値にし、残りは今までの値を保つ。
-                    merged.packet = FreeDMerger.Merge(merged.packet, ~receiver.Field, packet.packet, receiver.Field);
+                    FreeDMerger.CopyFields(merged.packet, receivedPacket, receiver.Field);
                     merged.fields |= receiver.Field;
                 }
             }

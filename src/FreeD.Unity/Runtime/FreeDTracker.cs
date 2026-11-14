@@ -66,7 +66,7 @@ namespace CIFER.tech.FreeD.Unity
         /// <summary>
         /// field の項目だけを反映する。このカメラ ID で、まだ届いていない項目は値が 0 のままなので、反映しない。
         /// </summary>
-        public void Apply(in FreeDPacket packet, FreeDField field)
+        public void Apply(FreeDPacket packet, FreeDField field)
         {
             // FreeD 座標 (X=右, Y=前, Z=上, m) での姿勢。
             // 回転は Rz(パン) · Rx(チルト) · Ry(ロール)。角度の正の向きは送信機器の仕様によるので、向きが逆なら rotationScale で反転する。

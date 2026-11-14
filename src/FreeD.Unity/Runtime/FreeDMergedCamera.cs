@@ -5,7 +5,7 @@ namespace CIFER.tech.FreeD.Unity
     /// <summary>カメラ ID ごとの、合成したパケットと、Receiver から届いたことのある項目。</summary>
     internal sealed class FreeDMergedCamera
     {
-        public FreeDPacket packet;
+        public readonly FreeDPacket packet = new FreeDPacket();
         public FreeDField fields;
     }
 }
