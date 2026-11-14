@@ -1,23 +1,31 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- ソースは Unity パッケージ (Unity/Runtime/Core) に置き、Unity と .NET のアプリで同じソースを使う。DLL は作って同梱しない -->
+  <!-- netstandard2.1: 普通の .NET アプリからも、Unity (2021.2+) のパッケージに同梱した DLL からも使える -->
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
-    <RootNamespace>FreeD</RootNamespace>
-    <AssemblyName>FreeD</AssemblyName>
+    <RootNamespace>CIFER.tech.FreeD.Core</RootNamespace>
+    <AssemblyName>CIFER.tech.FreeD.Core</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <Deterministic>true</Deterministic>
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>CIFER.tech.FreeD.Core</PackageId>
+    <Version>2.0.0</Version>
+    <Authors>CIFER.tech</Authors>
+    <Description>FreeD (D1, 29 バイト) メッセージの符号化・復号・合成と、UDP での受信。</Description>
+    <RepositoryUrl>https://github.com/CIFER-tech/FreeD</RepositoryUrl>
+  </PropertyGroup>
+
+  <!-- FreeDReceiver が使う。RingBuffer のリポジトリを、このリポジトリの隣に置く。別の場所に置くときは -p:RingBufferProject=パス で変える -->
+  <PropertyGroup>
+    <RingBufferProject Condition="'$(RingBufferProject)' == ''">..\..\..\RingBuffer\src\RingBuffer\RingBuffer.csproj</RingBufferProject>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\Unity\Runtime\Core\**\*.cs" />
-  </ItemGroup>
-
-  <!-- FreeDReceiver が使う。RingBuffer のリポジトリを、このリポジトリの隣に置く -->
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\RingBuffer\src\RingBuffer\RingBuffer.csproj" />
+    <ProjectReference Include="$(RingBufferProject)" />
   </ItemGroup>
 
 </Project>

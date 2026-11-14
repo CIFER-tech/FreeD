@@ -1,10 +1,10 @@
 # FreeD
 
 FreeD (D1, 29 バイト) メッセージの符号化・復号ライブラリ (C#, netstandard2.1)。
-.NET 8 のアプリからも、Unity (2021.2+) のパッケージ (`Unity/`) からも、同じソースで使える。
+普通の .NET アプリからも、Unity (2021.2+) のパッケージ (`src/FreeD.Unity/`) からも、同じ DLL (`CIFER.tech.FreeD.Core.dll`) で使える。Unity のパッケージには、ビルドした DLL を同梱する。
 
-Unity からは Package Manager 経由でも導入できる ([`Unity/`](Unity) 参照、UPM パッケージ `tech.cifer.freed`)。
-Unity のパッケージは、受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) を使う (`Packages/manifest.json` に足す。手順は [`Unity/README.md`](Unity/README.md))。
+Unity からは Package Manager 経由でも導入できる ([`src/FreeD.Unity/`](src/FreeD.Unity) 参照、UPM パッケージ `tech.cifer.freed`)。
+Unity のパッケージは、受信したパケットをためるために、リングバッファのパッケージ [`tech.cifer.ringbuffer`](https://github.com/CIFER-tech/RingBuffer) を使う (`Packages/manifest.json` に足す。手順は [`src/FreeD.Unity/README.md`](src/FreeD.Unity/README.md))。
 
 ## 使い方
 
@@ -58,13 +58,27 @@ FreeDPacket merged = FreeDMerger.Merge(
 
 - 項目が重なったときは、2 つ目のパケットの値を使う。
 - 状態は持たない。最後に届いた値を保つこと、遅延、途切れの扱いは呼び出し側で行う。
-- Unity では `FreeDManager`・`FreeDReceiverForUnity`・`FreeDTracker` が使っている ([`Unity/`](Unity) 参照)。
+- Unity では `FreeDManager`・`FreeDReceiverForUnity`・`FreeDTracker` が使っている ([`src/FreeD.Unity/`](src/FreeD.Unity) 参照)。
 
 ## Unity で原点を合わせる
 
 `FreeDTracker` を付けたカメラの親のオブジェクトが、「FreeD 座標の原点が Unity のどこにあるか」になる。親の Position と Rotation の Y に、原点の位置と水平の向きを入れる (青い矢印 = FreeD の Y、赤い矢印 = X)。
 
 - 吸収するのは位置 3 軸と水平の向きだけ。床は水平とみなすので、親の傾き (X・Z の回転) は 0 にする。
+
+## 普通の .NET アプリで使う
+
+ソースは `src/FreeD/` にある (netstandard2.1、名前空間は `CIFER.tech.FreeD.Core`)。符号化・復号・合成と、UDP の受信 (`FreeDReceiver`) を持つ。受信は RingBuffer ([`CIFER.tech.RingBuffer`](https://github.com/CIFER-tech/RingBuffer)) を使う。
+
+タグ (`v*`) を付けると、GitHub Actions が `.nupkg` を作って、GitHub の Releases に添付する。nuget.org には公開しない。取り出した `.nupkg` を置いたフォルダを、NuGet のローカルのソースにして使う (RingBuffer の `.nupkg` も同じ方法で取り出す)。
+
+プロジェクトを直接参照することもできる。
+
+```xml
+<ProjectReference Include="..\FreeD\src\FreeD\FreeD.csproj" />
+```
+
+RingBuffer のリポジトリは、FreeD の隣に置く。別の場所に置くときは、`-p:RingBufferProject=パス` で変える。
 
 ## ビルドとテスト
 

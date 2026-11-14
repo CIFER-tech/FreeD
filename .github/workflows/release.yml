@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Unity DLL is synced
+        run: |
+          # DLL を同期したコミットより前のコミットにタグを付けると、古い DLL が配られる
+          src_commit=$(git log -1 --format=%H -- src/FreeD)
+          dll_commit=$(git log -1 --format=%H -- src/FreeD.Unity/Runtime/CIFER.tech.FreeD.Core.dll)
+          if ! git merge-base --is-ancestor "$src_commit" "$dll_commit"; then
+            echo "src/FreeD の最後の変更 ($src_commit) が、DLL の最後の同期 ($dll_commit) より新しい。DLL の同期のあとのコミットにタグを付ける。"
+            exit 1
+          fi
+
+      - name: Checkout RingBuffer
+        uses: actions/checkout@v4
+        with:
+          repository: CIFER-tech/RingBuffer
+          ref: v4.0.0
+          path: RingBuffer
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Test
+        run: dotnet test -p:RingBufferProject=${{ github.workspace }}/RingBuffer/src/RingBuffer/RingBuffer.csproj
+
+      - name: Pack
+        run: dotnet pack src/FreeD/FreeD.csproj -c Release -o out -p:RingBufferProject=${{ github.workspace }}/RingBuffer/src/RingBuffer/RingBuffer.csproj
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" out/*.nupkg --generate-notes --title "$GITHUB_REF_NAME"
