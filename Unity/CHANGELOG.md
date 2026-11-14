@@ -12,7 +12,7 @@
 - `FreeDOrigin` を廃止。`FreeDTracker` の親のオブジェクトが原点になる。親の Position と Rotation の Y で、原点の位置と向きを決める。
 - `FreeDLens` を、`FreeDTracker` と同じオブジェクトに付ける形にした。
 - 使う項目を、4 つのチェックボックスから、複数選べるドロップダウン (`FreeDFields`) に変更。並びは Position・Rotation・Zoom・Focus。
-- 状態の欄を、編集できない表示だけの欄にし、枠で囲んだ (Editor 用のアセンブリ `FreeD.Unity.Editor` を追加)。`pan`/`tilt`/`roll` と `xMm`/`yMm`/`zMm` は、Vector3 の `panTiltRollDeg` と `positionMm` にまとめた。
+- 状態の欄を、編集できない表示だけの欄にし、枠で囲んだ (Editor 用のアセンブリ `FreeD.Unity.Editor` を追加)。`pan`/`tilt`/`roll` と `xMm`/`yMm`/`zMm` は、Vector3 の `panTiltRollDeg` と `positionMm` にまとめた。`hasZoom`/`hasFocus` は廃止。
 - 再生中の左上の表示 (OnGUI) を廃止。状態は Inspector で見る。
 
 ## [1.3.0] - 2026-10-30

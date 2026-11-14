@@ -23,7 +23,8 @@ public class FreeDManager : MonoBehaviour
     // 受信を開いた Receiver。FreeDMerger の streamIndex は、この並びの添字。
     private readonly List<FreeDReceiver> _openedReceivers = new List<FreeDReceiver>();
     private readonly Dictionary<int, FreeDMerger> _mergersByCameraId = new Dictionary<int, FreeDMerger>();
-    private readonly Dictionary<int, FreeDMergedCamera> _mergedByCameraId = new Dictionary<int, FreeDMergedCamera>();
+    // カメラ ID ごとの、合成済みのパケット。値が 1 つも入っていない ID は入れない。
+    private readonly Dictionary<int, FreeDPacket> _mergedPacketsByCameraId = new Dictionary<int, FreeDPacket>();
     // シーンから見つけた Receiver (無効なものも含む)。有効・無効の切り替えを、Signature で見つける。
     private readonly List<FreeDReceiver> _foundReceivers = new List<FreeDReceiver>();
     private readonly List<FreeDTracker> _foundTrackers = new List<FreeDTracker>();
@@ -70,9 +71,9 @@ public class FreeDManager : MonoBehaviour
             {
                 continue;
             }
-            if (_mergedByCameraId.TryGetValue(tracker.cameraId, out FreeDMergedCamera merged))
+            if (_mergedPacketsByCameraId.TryGetValue(tracker.cameraId, out FreeDPacket merged))
             {
-                tracker.Apply(merged.filled, merged.packet, merged.isReceiving);
+                tracker.Apply(merged, FindOrAddCameraStatus(tracker.cameraId).isReceiving);
             }
             else
             {
@@ -109,7 +110,7 @@ public class FreeDManager : MonoBehaviour
         }
         _openedReceivers.Clear();
         _mergersByCameraId.Clear();
-        _mergedByCameraId.Clear();
+        _mergedPacketsByCameraId.Clear();
         cameras.Clear();
         receiving = false;
         totalPacketsPerSecond = 0;
@@ -205,7 +206,10 @@ public class FreeDManager : MonoBehaviour
                 isReceiving |= merger.IsReceiving(receiverIndex, nowMs);
             }
             FreeDFields filled = merger.Update(nowMs, out FreeDPacket packet);
-            _mergedByCameraId[pair.Key] = new FreeDMergedCamera { filled = filled, packet = packet, isReceiving = isReceiving };
+            if (filled != FreeDFields.None)
+            {
+                _mergedPacketsByCameraId[pair.Key] = packet;
+            }
 
             FreeDCameraStatus status = FindOrAddCameraStatus(pair.Key);
             status.isReceiving = isReceiving;

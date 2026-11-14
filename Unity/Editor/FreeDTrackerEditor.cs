@@ -7,7 +7,7 @@ public class FreeDTrackerEditor : FreeDStatusBoxEditor
     {
         get
         {
-            return new[] { "receiving", "panTiltRollDeg", "positionMm", "hasZoom", "zoomRaw", "hasFocus", "focusRaw" };
+            return new[] { "receiving", "panTiltRollDeg", "positionMm", "zoomRaw", "focusRaw" };
         }
     }
 }

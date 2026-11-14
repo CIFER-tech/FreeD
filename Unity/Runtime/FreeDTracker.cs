@@ -29,66 +29,42 @@ public class FreeDTracker : MonoBehaviour
     [FreeDReadOnly] public bool receiving;
     [Tooltip("度。X=パン, Y=チルト, Z=ロール (倍率をかけたあと)"), FreeDReadOnly] public Vector3 panTiltRollDeg;
     [Tooltip("mm。FreeD 座標 (X=右, Y=前, Z=上) (倍率をかけたあと)"), FreeDReadOnly] public Vector3 positionMm;
-    [FreeDReadOnly] public bool hasZoom;
     [Tooltip("ズームのエンコーダの生の値 (24bit)。FreeDLens が焦点距離に直す"), FreeDReadOnly] public uint zoomRaw;
-    [FreeDReadOnly] public bool hasFocus;
     [Tooltip("フォーカスのエンコーダの生の値 (24bit)。FreeDLens がピント距離に直す"), FreeDReadOnly] public uint focusRaw;
 
     /// <summary>同じオブジェクトの FreeDLens。FreeDManager が、探すときに入れる。</summary>
     [System.NonSerialized] internal FreeDLens lens;
 
     /// <summary>FreeDManager が毎フレーム呼ぶ。合成した値を、このオブジェクトの位置と向きに反映する。</summary>
-    internal void Apply(FreeDFields filled, FreeDPacket p, bool isReceiving)
+    internal void Apply(FreeDPacket p, bool isReceiving)
     {
         receiving = isReceiving;
-        bool hasRotation = (filled & FreeDFields.Rotation) != 0;
-        bool hasPosition = (filled & FreeDFields.Position) != 0;
-        if ((filled & FreeDFields.Zoom) != 0)
-        {
-            zoomRaw = p.ZoomRaw;
-            hasZoom = true;
-        }
-        if ((filled & FreeDFields.Focus) != 0)
-        {
-            focusRaw = p.FocusRaw;
-            hasFocus = true;
-        }
+        zoomRaw = p.ZoomRaw;
+        focusRaw = p.FocusRaw;
 
         float panDeg = (float)p.PanDegrees * rotationScale.x;
         float tiltDeg = (float)p.TiltDegrees * rotationScale.y;
         float rollDeg = (float)p.RollDegrees * rotationScale.z;
-        if (hasRotation)
-        {
-            panTiltRollDeg = new Vector3(panDeg, tiltDeg, rollDeg);
-        }
+        panTiltRollDeg = new Vector3(panDeg, tiltDeg, rollDeg);
         float xMeters = (float)p.XMeters * positionScale.x;
         float yMeters = (float)p.YMeters * positionScale.y;
         float zMeters = (float)p.ZMeters * positionScale.z;
-        if (hasPosition)
-        {
-            positionMm = new Vector3(xMeters * 1000, yMeters * 1000, zMeters * 1000);
-        }
+        positionMm = new Vector3(xMeters * 1000, yMeters * 1000, zMeters * 1000);
 
         // retroloc 座標 (X右 Y前 Z上) の姿勢。AngleAxis は数値的に標準の回転なので、そのまま合成できる。
-        // 回転を担当する Receiver がないときは p の角度が 0 なので、単位回転になる。
+        // 回転を担当する Receiver がないときは p の角度が 0 なので、単位回転になる。位置も同じで、0 になる。
         Quaternion q = Rot(panDeg, tiltDeg, rollDeg);
         Vector3 pos = new Vector3(xMeters, yMeters, zMeters);
 
         // Unity 座標へ変換してから、Unity のカメラのローカル軸でオフセットを適用する
         Vector3 uPos = new Vector3(pos.x, pos.z, pos.y);
         Quaternion uRot = new Quaternion(-q.x, -q.z, -q.y, q.w);
-        if (hasPosition)
-        {
-            transform.localPosition = uPos + uRot * positionOffset;
-        }
-        if (hasRotation)
-        {
-            transform.localRotation = uRot * Quaternion.Euler(rotationOffset);
-        }
+        transform.localPosition = uPos + uRot * positionOffset;
+        transform.localRotation = uRot * Quaternion.Euler(rotationOffset);
 
         if (lens != null)
         {
-            lens.Apply(hasZoom, zoomRaw, hasFocus, focusRaw);
+            lens.Apply(zoomRaw, focusRaw);
         }
     }
 
