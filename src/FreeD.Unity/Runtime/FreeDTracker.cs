@@ -63,7 +63,10 @@ namespace CIFER.tech.FreeD.Unity
             set => focusToDistanceM = value;
         }
 
-        public void Apply(in FreeDPacket packet)
+        /// <summary>
+        /// claimedFields の項目だけを反映する。どの Receiver も担当していない項目は、届いていない値 (0) なので、反映しない。
+        /// </summary>
+        public void Apply(in FreeDPacket packet, FreeDField claimedFields)
         {
             // FreeD 座標 (X=右, Y=前, Z=上, m) での姿勢。
             // 回転は Rz(パン) · Rx(チルト) · Ry(ロール)。角度の正の向きは送信機器の仕様によるので、向きが逆なら rotationScale で反転する。
@@ -82,23 +85,32 @@ namespace CIFER.tech.FreeD.Unity
                 freeDRotation.w);
 
             // オフセットは Unity のカメラのローカル軸で適用する。
-            transform.localPosition = unityPosition + unityRotation * positionOffset;
-            transform.localRotation = unityRotation * Quaternion.Euler(rotationOffset);
-
-            if (camera != null)
+            if ((claimedFields & FreeDField.Position) != 0)
             {
-                if (zoomToFocalLengthMm.length > 0)
-                {
-                    camera.usePhysicalProperties = true;
-                    camera.focalLength = zoomToFocalLengthMm.Evaluate(packet.ZoomRaw);
-                }
-#if UNITY_2022_2_OR_NEWER
-                if (focusToDistanceM.length > 0)
-                {
-                    camera.focusDistance = focusToDistanceM.Evaluate(packet.FocusRaw);
-                }
-#endif
+                transform.localPosition = unityPosition + unityRotation * positionOffset;
             }
+
+            if ((claimedFields & FreeDField.Rotation) != 0)
+            {
+                transform.localRotation = unityRotation * Quaternion.Euler(rotationOffset);
+            }
+
+            if (camera == null)
+            {
+                return;
+            }
+
+            if ((claimedFields & FreeDField.Zoom) != 0 && zoomToFocalLengthMm.length > 0)
+            {
+                camera.usePhysicalProperties = true;
+                camera.focalLength = zoomToFocalLengthMm.Evaluate(packet.ZoomRaw);
+            }
+#if UNITY_2022_2_OR_NEWER
+            if ((claimedFields & FreeDField.Focus) != 0 && focusToDistanceM.length > 0)
+            {
+                camera.focusDistance = focusToDistanceM.Evaluate(packet.FocusRaw);
+            }
+#endif
         }
 
         private void OnDrawGizmos()

@@ -58,7 +58,7 @@ namespace CIFER.tech.FreeD.Unity
         {
             CloseDestroyedReceivers();
 
-            if (HasOverlappedField())
+            if (HasOverlappedField(out var claimedFields))
             {
                 return;
             }
@@ -86,7 +86,7 @@ namespace CIFER.tech.FreeD.Unity
 
                 if (mergedPackets.TryGetValue(tracker.CameraId, out var mergedPacket))
                 {
-                    tracker.Apply(mergedPacket);
+                    tracker.Apply(mergedPacket, claimedFields);
                 }
             }
         }
@@ -107,10 +107,13 @@ namespace CIFER.tech.FreeD.Unity
             }
         }
 
-        /// <summary>同じ項目を 2 つのストリームが担当すると合成できないので、重なっていないかを調べる。</summary>
-        private bool HasOverlappedField()
+        /// <summary>
+        /// 同じ項目を 2 つのストリームが担当すると合成できないので、重なっていないかを調べる。
+        /// claimedFields は、いずれかの Receiver が担当している項目。
+        /// </summary>
+        private bool HasOverlappedField(out FreeDField claimedFields)
         {
-            var claimedFields = FreeDField.None;
+            claimedFields = FreeDField.None;
             var isOverlapped = false;
 
             foreach (var receiver in receivers)
