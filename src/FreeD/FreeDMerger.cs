@@ -7,18 +7,24 @@ namespace CIFER.tech.FreeD.Core
     public static class FreeDMerger
     {
         /// <summary>
-        /// <paramref name="fieldA"/> の項目は <paramref name="packetA"/> から、<paramref name="fieldB"/> の項目は <paramref name="packetB"/> から取った新しいパケットを返す。
+        /// <paramref name="fieldA"/> の項目は <paramref name="packetA"/> から、<paramref name="fieldB"/> の項目は <paramref name="packetB"/> から取って、
+        /// <paramref name="destination"/> に書き込む。確保はしない。
         /// どちらにも含まれない項目は既定値になる。両方に含まれる項目は <paramref name="packetB"/> の値を使う。
+        /// <paramref name="destination"/> は、<paramref name="packetA"/> と <paramref name="packetB"/> とは別のオブジェクトにする。
         /// </summary>
-        public static FreeDPacket Merge(in FreeDPacket packetA, FreeDField fieldA, in FreeDPacket packetB, FreeDField fieldB)
+        public static void Merge(
+            FreeDPacket destination, FreeDPacket packetA, FreeDField fieldA, FreeDPacket packetB, FreeDField fieldB)
         {
-            var merged = new FreeDPacket();
-            CopyFields(ref merged, packetA, fieldA);
-            CopyFields(ref merged, packetB, fieldB);
-            return merged;
+            destination.Clear();
+            CopyFields(destination, packetA, fieldA);
+            CopyFields(destination, packetB, fieldB);
         }
 
-        private static void CopyFields(ref FreeDPacket merged, in FreeDPacket source, FreeDField field)
+        /// <summary>
+        /// <paramref name="field"/> の項目だけを、<paramref name="source"/> から <paramref name="merged"/> に写す。残りの項目は、そのまま。
+        /// カメラ ID とユーザーデータは写さない。確保はしない。
+        /// </summary>
+        public static void CopyFields(FreeDPacket merged, FreeDPacket source, FreeDField field)
         {
             if ((field & FreeDField.Rotation) != 0)
             {

@@ -6,7 +6,7 @@ namespace CIFER.tech.FreeD.Core
     /// 位置は右手系で、X=右、Y=前、Z=上。
     /// 角度の正の向きは、送信する機器の仕様による。
     /// </summary>
-    public struct FreeDPacket
+    public sealed class FreeDPacket
     {
         public byte CameraId;
 
@@ -35,5 +35,35 @@ namespace CIFER.tech.FreeD.Core
         public uint FocusRaw;
 
         public ushort UserData;
+
+        /// <summary>すべての項目を、既定値 (0) に戻す。</summary>
+        public void Clear()
+        {
+            CameraId = 0;
+            PanDegrees = 0;
+            TiltDegrees = 0;
+            RollDegrees = 0;
+            XMeters = 0;
+            YMeters = 0;
+            ZMeters = 0;
+            ZoomRaw = 0;
+            FocusRaw = 0;
+            UserData = 0;
+        }
+
+        /// <summary><paramref name="source"/> の項目を、すべてこのオブジェクトに写す。</summary>
+        public void CopyFrom(FreeDPacket source)
+        {
+            CameraId = source.CameraId;
+            PanDegrees = source.PanDegrees;
+            TiltDegrees = source.TiltDegrees;
+            RollDegrees = source.RollDegrees;
+            XMeters = source.XMeters;
+            YMeters = source.YMeters;
+            ZMeters = source.ZMeters;
+            ZoomRaw = source.ZoomRaw;
+            FocusRaw = source.FocusRaw;
+            UserData = source.UserData;
+        }
     }
 }

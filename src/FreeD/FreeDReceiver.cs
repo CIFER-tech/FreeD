@@ -10,6 +10,7 @@ namespace CIFER.tech.FreeD.Core
     public sealed class FreeDReceiver : IDisposable
     {
         // 送信が 60 fps より速くても足りるように、最低限の数と、遅延 1 秒あたりの数 (240 fps 相当) を持つ。
+        // この数だけ FreeDReceivedPacket を最初に作り、使い回す。
         private const int MinCapacity = 256;
         private const int CapacityPerDelaySec = 240;
 
@@ -19,7 +20,11 @@ namespace CIFER.tech.FreeD.Core
         private float delaySec;
         // 受信スレッドで起きた例外。スレッドの外へは投げられないので、TryTakeNext で投げる。
         private volatile Exception? receiveException;
-        private RingBuffer<FreeDReceivedPacket>? buffer;
+
+        // 受信して、まだ取り出していないパケット (古い順) と、空いているパケット。
+        // 2 つのキューの容量は、作ったパケットの数と同じなので、入れるときに古いものが捨てられることはない。
+        private RingBuffer<FreeDReceivedPacket>? filledPackets;
+        private RingBuffer<FreeDReceivedPacket>? freePackets;
         private Socket? socket;
 
         public void Dispose()
@@ -33,8 +38,16 @@ namespace CIFER.tech.FreeD.Core
 
             this.delaySec = delaySec;
             receiveException = null;
-            var receivedPackets = new RingBuffer<FreeDReceivedPacket>(MinCapacity + (int)(delaySec * CapacityPerDelaySec));
-            buffer = receivedPackets;
+            var packetCount = MinCapacity + (int)(delaySec * CapacityPerDelaySec);
+            var filled = new RingBuffer<FreeDReceivedPacket>(packetCount);
+            var free = new RingBuffer<FreeDReceivedPacket>(packetCount);
+            for (var i = 0; i < packetCount; i++)
+            {
+                free.Enqueue(new FreeDReceivedPacket());
+            }
+
+            filledPackets = filled;
+            freePackets = free;
 
             var openedSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             try
@@ -51,7 +64,7 @@ namespace CIFER.tech.FreeD.Core
 
             // ReceiveAsync は 1 回ごとに Task・UdpReceiveResult・byte[] を作るので、
             // 専用スレッドで同じバッファに受信し続けて、受信経路の確保をなくす。
-            var receiveThread = new Thread(() => ReceiveLoop(openedSocket, receivedPackets))
+            var receiveThread = new Thread(() => ReceiveLoop(openedSocket, filled, free))
             {
                 IsBackground = true,
                 Name = "FreeDReceiver:" + port
@@ -66,7 +79,7 @@ namespace CIFER.tech.FreeD.Core
             socket = null;
         }
 
-        private void ReceiveLoop(Socket receivingSocket, RingBuffer<FreeDReceivedPacket> receivedPackets)
+        private void ReceiveLoop(Socket receivingSocket, RingBuffer<FreeDReceivedPacket> filled, RingBuffer<FreeDReceivedPacket> free)
         {
             var datagram = new byte[DatagramBufferSize];
 
@@ -98,23 +111,30 @@ namespace CIFER.tech.FreeD.Core
                     return;
                 }
 
-                if (FreeDCodec.TryDecode(new ReadOnlySpan<byte>(datagram, 0, length), out var packet))
+                // 空いているパケットがなければ、取り出されていないいちばん古いものを使い回す (古いものを捨てる)。
+                if (!free.TryDequeue(out var slot) && !filled.TryDequeue(out slot))
                 {
-                    receivedPackets.Enqueue(new FreeDReceivedPacket
-                    {
-                        receivedMs = FreeDClock.NowMs,
-                        packet = packet
-                    });
+                    continue;
+                }
+
+                if (FreeDCodec.TryDecode(new ReadOnlySpan<byte>(datagram, 0, length), slot.packet))
+                {
+                    slot.receivedMs = FreeDClock.NowMs;
+                    filled.Enqueue(slot);
+                }
+                else
+                {
+                    free.Enqueue(slot);
                 }
             }
         }
 
-        /// <summary>遅延を過ぎたパケットのうち、最も古い 1 つを取り出す。なければ false。</summary>
+        /// <summary>
+        /// 遅延を過ぎたパケットのうち、最も古い 1 つを、<paramref name="destination"/> に写して取り出す。なければ false。確保はしない。
+        /// </summary>
         /// <exception cref="InvalidOperationException">受信が途中で失敗して止まったとき。1 回だけ投げる。</exception>
-        public bool TryTakeNext(out FreeDReceivedPacket received)
+        public bool TryTakeNext(FreeDPacket destination)
         {
-            received = default;
-
             var failure = receiveException;
             if (failure != null)
             {
@@ -122,18 +142,25 @@ namespace CIFER.tech.FreeD.Core
                 throw failure;
             }
 
-            if (buffer == null)
+            if (filledPackets == null || freePackets == null)
             {
                 return false;
             }
 
             var delayedNowMs = FreeDClock.NowMs - delaySec * 1000d;
-            if (!buffer.TryPeek(out var peeked) || peeked.receivedMs > delayedNowMs)
+            if (!filledPackets.TryPeek(out var peeked) || peeked.receivedMs > delayedNowMs)
             {
                 return false;
             }
 
-            return buffer.TryDequeue(out received);
+            if (!filledPackets.TryDequeue(out var slot))
+            {
+                return false;
+            }
+
+            destination.CopyFrom(slot.packet);
+            freePackets.Enqueue(slot);
+            return true;
         }
     }
 }

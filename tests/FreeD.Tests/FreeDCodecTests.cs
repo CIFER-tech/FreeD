@@ -51,7 +51,8 @@ public class FreeDCodecTests
     [Fact]
     public void Decode_ReadsTheHandComputedBytes()
     {
-        Assert.True(FreeDCodec.TryDecode(KnownPacket, out FreeDPacket p));
+        var p = new FreeDPacket();
+        Assert.True(FreeDCodec.TryDecode(KnownPacket, p));
         Assert.Equal((byte)1, p.CameraId);
         Approx(90.0, p.PanDegrees, 1e-9);
         Approx(-45.0, p.TiltDegrees, 1e-9);
@@ -85,7 +86,8 @@ public class FreeDCodecTests
                 UserData = (ushort)rng.Next(0, 0x10000),
             };
             FreeDCodec.Encode(src, buffer);
-            Assert.True(FreeDCodec.TryDecode(buffer, out FreeDPacket dst));
+            var dst = new FreeDPacket();
+            Assert.True(FreeDCodec.TryDecode(buffer, dst));
 
             const double angleRes = 0.5 / 32768.0;   // 半 LSB
             const double posRes = 0.5 / 64000.0;
@@ -107,15 +109,15 @@ public class FreeDCodecTests
     {
         var bad = (byte[])KnownPacket.Clone();
         bad[28] ^= 0x01;
-        Assert.False(FreeDCodec.TryDecode(bad, out _));
+        Assert.False(FreeDCodec.TryDecode(bad, new FreeDPacket()));
 
         var wrongType = (byte[])KnownPacket.Clone();
         wrongType[0] = 0xD2;
         wrongType[28] = FreeDCodec.Checksum(wrongType.AsSpan(0, 28));
-        Assert.False(FreeDCodec.TryDecode(wrongType, out _));
+        Assert.False(FreeDCodec.TryDecode(wrongType, new FreeDPacket()));
 
-        Assert.False(FreeDCodec.TryDecode(KnownPacket.AsSpan(0, 28), out _));
-        Assert.False(FreeDCodec.TryDecode(ReadOnlySpan<byte>.Empty, out _));
+        Assert.False(FreeDCodec.TryDecode(KnownPacket.AsSpan(0, 28), new FreeDPacket()));
+        Assert.False(FreeDCodec.TryDecode(ReadOnlySpan<byte>.Empty, new FreeDPacket()));
     }
 
     [Fact]
@@ -123,7 +125,8 @@ public class FreeDCodecTests
     {
         var buffer = new byte[FreeDCodec.PacketLength];
         FreeDCodec.Encode(new FreeDPacket { XMeters = 1000.0, YMeters = -1000.0, ZoomRaw = 0xFFFFFFFF }, buffer);
-        Assert.True(FreeDCodec.TryDecode(buffer, out FreeDPacket p));
+        var p = new FreeDPacket();
+        Assert.True(FreeDCodec.TryDecode(buffer, p));
         Approx(8388607.0 / 64000.0, p.XMeters, 1e-9);
         Approx(-8388608.0 / 64000.0, p.YMeters, 1e-9);
         Assert.Equal(0xFFFFFFu, p.ZoomRaw);
