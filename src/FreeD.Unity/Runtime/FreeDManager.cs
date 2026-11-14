@@ -10,7 +10,8 @@ namespace CIFER.tech.FreeD.Unity
     {
         private readonly List<FreeDReceiverForUnity> receivers = new();
         private readonly List<FreeDTracker> trackers = new();
-        private readonly Dictionary<int, FreeDMergedCamera> mergedCameras = new();
+        // カメラ ID ごとの、合成したパケットと、Receiver から届いたことのある項目。
+        private readonly Dictionary<int, (FreeDPacket packet, FreeDField receivedFields)> mergedCameras = new();
 
         private void OnEnable()
         {
