@@ -2,7 +2,7 @@
     "name": "FreeD.Unity",
     "rootNamespace": "",
     "references": [
-        "RingBuffer"
+        "CIFER.Tech.RingBuffer"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
