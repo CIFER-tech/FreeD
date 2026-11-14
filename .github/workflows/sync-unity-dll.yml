@@ -17,12 +17,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout RingBuffer
+        uses: actions/checkout@v4
+        with:
+          repository: CIFER-tech/RingBuffer
+          path: RingBuffer
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
 
       - name: Build FreeD (Release)
-        run: dotnet build src/FreeD/FreeD.csproj -c Release
+        run: dotnet build src/FreeD/FreeD.csproj -c Release -p:RingBufferProject=${{ github.workspace }}/RingBuffer/src/RingBuffer/RingBuffer.csproj
 
       - name: Copy build output into Unity package
         run: |

@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout RingBuffer
+        uses: actions/checkout@v4
+        with:
+          repository: CIFER-tech/RingBuffer
+          path: RingBuffer
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Test
+        run: dotnet test -p:RingBufferProject=${{ github.workspace }}/RingBuffer/src/RingBuffer/RingBuffer.csproj
+
+      - name: Pack
+        run: dotnet pack src/FreeD/FreeD.csproj -c Release -o out -p:RingBufferProject=${{ github.workspace }}/RingBuffer/src/RingBuffer/RingBuffer.csproj
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" out/*.nupkg --generate-notes --title "$GITHUB_REF_NAME"
