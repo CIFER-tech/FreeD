@@ -34,7 +34,7 @@ public class FreeDReceiverTests
         // 容量 (最低 256) を超える数を、取り出さずに送る。古いものは捨てられる。
         const int sentCount = 1000;
         SendPackets(port, firstZoom: 1, count: sentCount);
-        WaitUntilQuiet(receiver);
+        WaitUntilProcessed(receiver, sentCount);
 
         var received = new FreeDPacket();
         uint last = 0;
@@ -79,13 +79,13 @@ public class FreeDReceiverTests
         // 容量 (最低 256) ちょうどを送って、いっぱいにする。そのあとに、FreeD でないデータグラムを送る。
         const int capacity = 256;
         SendPackets(port, firstZoom: 1, count: capacity);
-        WaitUntilQuiet(receiver);
+        WaitUntilProcessed(receiver, capacity);
         using (var client = new UdpClient())
         {
             client.Send(new byte[] { 1, 2, 3 }, 3, new IPEndPoint(IPAddress.Loopback, port));
         }
 
-        WaitUntilQuiet(receiver);
+        WaitUntilProcessed(receiver, capacity + 1);
 
         var received = new FreeDPacket();
         for (uint expectedZoom = 1; expectedZoom <= capacity; expectedZoom++)
@@ -109,10 +109,17 @@ public class FreeDReceiverTests
         return received;
     }
 
-    // 受信スレッドが、送ったパケットをすべて処理し終えるまで待つ (しばらく届かなくなるまで)。
-    private static void WaitUntilQuiet(FreeDReceiver receiver)
+    // 受信スレッドが、データグラムを expectedCount 個処理し終えるまで待つ (FreeD として正しくないものも数える)。
+    private static void WaitUntilProcessed(FreeDReceiver receiver, long expectedCount)
     {
-        Thread.Sleep(500);
+        var stopwatch = Stopwatch.StartNew();
+        while (receiver.ProcessedDatagramCount < expectedCount)
+        {
+            Assert.True(
+                stopwatch.ElapsedMilliseconds < 5000,
+                $"5 秒待っても、{expectedCount} 個を処理し終えなかった (処理済み: {receiver.ProcessedDatagramCount})");
+            Thread.Sleep(1);
+        }
     }
 
     private static void SendPackets(int port, uint firstZoom, int count)

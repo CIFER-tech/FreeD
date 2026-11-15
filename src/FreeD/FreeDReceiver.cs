@@ -18,6 +18,9 @@ namespace CIFER.tech.FreeD.Core
         private const int DatagramBufferSize = 64;
 
         private float delaySec;
+
+        // 受信スレッドが処理し終えたデータグラムの数 (FreeD として正しくないものも含む)。
+        private long processedDatagramCount;
         // 受信スレッドで起きた例外。スレッドの外へは投げられないので、TryTakeNext で投げる。
         private volatile Exception? receiveException;
 
@@ -30,6 +33,15 @@ namespace CIFER.tech.FreeD.Core
         // 取り出す側の「先頭を見て、時刻を比べて、取り出す」とこれが重ならないように、同じ鍵で守る。
         private readonly object recycleGate = new object();
         private Socket? socket;
+
+        /// <summary>受信スレッドが処理し終えたデータグラムの数。FreeD として正しくないものも数える。テストなどで、受信の進み具合を見る。</summary>
+        public long ProcessedDatagramCount
+        {
+            get
+            {
+                return Interlocked.Read(ref processedDatagramCount);
+            }
+        }
 
         public void Dispose()
         {
@@ -107,6 +119,7 @@ namespace CIFER.tech.FreeD.Core
                     // バッファより大きなデータグラムは FreeD ではないので、捨てて受信を続ける。
                     if (e.SocketErrorCode == SocketError.MessageSize)
                     {
+                        Interlocked.Increment(ref processedDatagramCount);
                         continue;
                     }
 
@@ -121,6 +134,7 @@ namespace CIFER.tech.FreeD.Core
 
                 if (!FreeDCodec.TryDecode(new ReadOnlySpan<byte>(datagram, 0, length), decoded))
                 {
+                    Interlocked.Increment(ref processedDatagramCount);
                     continue;
                 }
 
@@ -137,6 +151,7 @@ namespace CIFER.tech.FreeD.Core
                 slot.packet.CopyFrom(decoded);
                 slot.receivedMs = FreeDClock.NowMs;
                 filled.Enqueue(slot);
+                Interlocked.Increment(ref processedDatagramCount);
             }
         }
 
