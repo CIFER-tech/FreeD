@@ -69,6 +69,34 @@ public class FreeDReceiverTests
         Assert.Equal(7u, TakeNextWithin(receiver, received).ZoomRaw);
     }
 
+    [Fact]
+    public void TryTakeNext_WhenQueueIsFull_DoesNotDropValidPacketsForADatagramThatIsNotFreeD()
+    {
+        using var receiver = new FreeDReceiver();
+        var port = FindFreePort();
+        receiver.Open(port, 0f);
+
+        // 容量 (最低 256) ちょうどを送って、いっぱいにする。そのあとに、FreeD でないデータグラムを送る。
+        const int capacity = 256;
+        SendPackets(port, firstZoom: 1, count: capacity);
+        WaitUntilQuiet(receiver);
+        using (var client = new UdpClient())
+        {
+            client.Send(new byte[] { 1, 2, 3 }, 3, new IPEndPoint(IPAddress.Loopback, port));
+        }
+
+        WaitUntilQuiet(receiver);
+
+        var received = new FreeDPacket();
+        for (uint expectedZoom = 1; expectedZoom <= capacity; expectedZoom++)
+        {
+            Assert.True(receiver.TryTakeNext(received), $"{expectedZoom} 番目が、取り出せない (捨てられた)");
+            Assert.Equal(expectedZoom, received.ZoomRaw);
+        }
+
+        Assert.False(receiver.TryTakeNext(received));
+    }
+
     private static FreeDPacket TakeNextWithin(FreeDReceiver receiver, FreeDPacket received)
     {
         var stopwatch = Stopwatch.StartNew();

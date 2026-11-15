@@ -25,6 +25,10 @@ namespace CIFER.tech.FreeD.Core
         // 2 つのキューの容量は、作ったパケットの数と同じなので、入れるときに古いものが捨てられることはない。
         private RingBuffer<FreeDReceivedPacket>? filledPackets;
         private RingBuffer<FreeDReceivedPacket>? freePackets;
+
+        // 空きがないとき、受信スレッドは、取り出されていないいちばん古いパケットを使い回す。
+        // 取り出す側の「先頭を見て、時刻を比べて、取り出す」とこれが重ならないように、同じ鍵で守る。
+        private readonly object recycleGate = new object();
         private Socket? socket;
 
         public void Dispose()
@@ -83,6 +87,10 @@ namespace CIFER.tech.FreeD.Core
         {
             var datagram = new byte[DatagramBufferSize];
 
+            // 先に、ここに復号して、FreeD として正しいと分かってから、パケットを使い回す。
+            // 正しくないデータグラムで、取り出されていない正しいパケットを捨てないため。
+            var decoded = new FreeDPacket();
+
             while (true)
             {
                 int length;
@@ -111,21 +119,24 @@ namespace CIFER.tech.FreeD.Core
                     return;
                 }
 
-                // 空いているパケットがなければ、取り出されていないいちばん古いものを使い回す (古いものを捨てる)。
-                if (!free.TryDequeue(out var slot) && !filled.TryDequeue(out slot))
+                if (!FreeDCodec.TryDecode(new ReadOnlySpan<byte>(datagram, 0, length), decoded))
                 {
                     continue;
                 }
 
-                if (FreeDCodec.TryDecode(new ReadOnlySpan<byte>(datagram, 0, length), slot.packet))
+                // 空いているパケットがなければ、取り出されていないいちばん古いものを使い回す (古いものを捨てる)。
+                FreeDReceivedPacket? slot;
+                lock (recycleGate)
                 {
-                    slot.receivedMs = FreeDClock.NowMs;
-                    filled.Enqueue(slot);
+                    if (!free.TryDequeue(out slot) && !filled.TryDequeue(out slot))
+                    {
+                        continue;
+                    }
                 }
-                else
-                {
-                    free.Enqueue(slot);
-                }
+
+                slot.packet.CopyFrom(decoded);
+                slot.receivedMs = FreeDClock.NowMs;
+                filled.Enqueue(slot);
             }
         }
 
@@ -148,14 +159,18 @@ namespace CIFER.tech.FreeD.Core
             }
 
             var delayedNowMs = FreeDClock.NowMs - delaySec * 1000d;
-            if (!filledPackets.TryPeek(out var peeked) || peeked.receivedMs > delayedNowMs)
+            FreeDReceivedPacket? slot;
+            lock (recycleGate)
             {
-                return false;
-            }
+                if (!filledPackets.TryPeek(out var peeked) || peeked.receivedMs > delayedNowMs)
+                {
+                    return false;
+                }
 
-            if (!filledPackets.TryDequeue(out var slot))
-            {
-                return false;
+                if (!filledPackets.TryDequeue(out slot))
+                {
+                    return false;
+                }
             }
 
             destination.CopyFrom(slot.packet);
