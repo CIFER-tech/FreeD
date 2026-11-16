@@ -66,6 +66,36 @@ namespace CIFER.tech.FreeD.Unity
             set => focusToDistanceM = value;
         }
 
+        private void OnEnable()
+        {
+            manager = FreeDManager.Instance;
+            manager.AddTracker(this);
+        }
+
+        private void OnDisable()
+        {
+            if (manager != null)
+            {
+                manager.RemoveTracker(this);
+                manager = null;
+            }
+        }
+
+        private void OnDrawGizmos()
+        {
+            // 親が FreeD 座標の原点。親がなければワールドの原点。
+            var origin = transform.parent;
+            var originPosition = origin != null ? origin.position : Vector3.zero;
+            var originRotation = origin != null ? origin.rotation : Quaternion.identity;
+
+            Gizmos.color = Color.red;
+            Gizmos.DrawLine(originPosition, originPosition + originRotation * Vector3.right * GizmoArrowLengthM);
+            Gizmos.color = Color.green;
+            Gizmos.DrawLine(originPosition, originPosition + originRotation * Vector3.up * GizmoArrowLengthM);
+            Gizmos.color = Color.blue;
+            Gizmos.DrawLine(originPosition, originPosition + originRotation * Vector3.forward * GizmoArrowLengthM);
+        }
+
         /// <summary>届いていない項目は値が 0 のままなので、appliedFields の項目だけを反映する。</summary>
         public void Apply(in FreeDPacket packet, FreeDField appliedFields = FreeDField.All)
         {
@@ -113,36 +143,6 @@ namespace CIFER.tech.FreeD.Unity
                 }
 #endif
             }
-        }
-
-        private void OnEnable()
-        {
-            manager = FreeDManager.Instance;
-            manager.AddTracker(this);
-        }
-
-        private void OnDisable()
-        {
-            if (manager != null)
-            {
-                manager.RemoveTracker(this);
-                manager = null;
-            }
-        }
-
-        private void OnDrawGizmos()
-        {
-            // 親が FreeD 座標の原点。親がなければワールドの原点。
-            var origin = transform.parent;
-            var originPosition = origin != null ? origin.position : Vector3.zero;
-            var originRotation = origin != null ? origin.rotation : Quaternion.identity;
-
-            Gizmos.color = Color.red;
-            Gizmos.DrawLine(originPosition, originPosition + originRotation * Vector3.right * GizmoArrowLengthM);
-            Gizmos.color = Color.green;
-            Gizmos.DrawLine(originPosition, originPosition + originRotation * Vector3.up * GizmoArrowLengthM);
-            Gizmos.color = Color.blue;
-            Gizmos.DrawLine(originPosition, originPosition + originRotation * Vector3.forward * GizmoArrowLengthM);
         }
     }
 }

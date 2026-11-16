@@ -39,18 +39,6 @@ namespace CIFER.tech.FreeD.Unity
             }
         }
 
-        private static T FindExistingInstance()
-        {
-#if UNITY_6000_5_OR_NEWER
-            var found = FindObjectsByType<T>(FindObjectsInactive.Include);
-#elif UNITY_2022_2_OR_NEWER
-            var found = FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-#else
-            var found = FindObjectsOfType<T>(true);
-#endif
-            return found.Length > 0 ? found[0] : null;
-        }
-
         protected virtual void Awake()
         {
             if (instance != null && instance != this)
@@ -78,6 +66,18 @@ namespace CIFER.tech.FreeD.Unity
             {
                 instance = null;
             }
+        }
+
+        private static T FindExistingInstance()
+        {
+#if UNITY_6000_5_OR_NEWER
+            var found = FindObjectsByType<T>(FindObjectsInactive.Include);
+#elif UNITY_2022_2_OR_NEWER
+            var found = FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+#else
+            var found = FindObjectsOfType<T>(true);
+#endif
+            return found.Length > 0 ? found[0] : null;
         }
     }
 }
