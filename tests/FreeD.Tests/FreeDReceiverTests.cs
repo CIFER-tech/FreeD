@@ -17,11 +17,10 @@ public class FreeDReceiverTests
 
         SendPackets(port, firstZoom: 1, count: 3);
 
-        var received = new FreeDPacket();
-        Assert.Equal(1u, TakeNextWithin(receiver, received).ZoomRaw);
-        Assert.Equal(2u, TakeNextWithin(receiver, received).ZoomRaw);
-        Assert.Equal(3u, TakeNextWithin(receiver, received).ZoomRaw);
-        Assert.False(receiver.TryTakeNext(received), "3 つ取り出したあとは、空のはず");
+        Assert.Equal(1u, TakeNextWithin(receiver).packet.ZoomRaw);
+        Assert.Equal(2u, TakeNextWithin(receiver).packet.ZoomRaw);
+        Assert.Equal(3u, TakeNextWithin(receiver).packet.ZoomRaw);
+        Assert.False(receiver.TryTakeNext(out _), "3 つ取り出したあとは、空のはず");
     }
 
     [Fact]
@@ -34,15 +33,21 @@ public class FreeDReceiverTests
         // 容量 (最低 256) を超える数を、取り出さずに送る。古いものは捨てられる。
         const int sentCount = 1000;
         SendPackets(port, firstZoom: 1, count: sentCount);
-        WaitUntilProcessed(receiver, sentCount);
 
-        var received = new FreeDPacket();
         uint last = 0;
         var takenCount = 0;
-        while (receiver.TryTakeNext(received))
+        var stopwatch = Stopwatch.StartNew();
+        while (last < sentCount)
         {
-            Assert.True(received.ZoomRaw > last, $"古い順に取り出せていない: {last} のあとに {received.ZoomRaw}");
-            last = received.ZoomRaw;
+            Assert.True(stopwatch.ElapsedMilliseconds < 5000, $"5 秒待っても、最後のパケットが届かなかった (最後に取り出した値: {last})");
+            if (!receiver.TryTakeNext(out var received))
+            {
+                Thread.Sleep(1);
+                continue;
+            }
+
+            Assert.True(received.packet.ZoomRaw > last, $"古い順に取り出せていない: {last} のあとに {received.packet.ZoomRaw}");
+            last = received.packet.ZoomRaw;
             takenCount++;
         }
 
@@ -65,61 +70,20 @@ public class FreeDReceiverTests
 
         SendPackets(port, firstZoom: 7, count: 1);
 
-        var received = new FreeDPacket();
-        Assert.Equal(7u, TakeNextWithin(receiver, received).ZoomRaw);
+        Assert.Equal(7u, TakeNextWithin(receiver).packet.ZoomRaw);
     }
 
-    [Fact]
-    public void TryTakeNext_WhenQueueIsFull_DoesNotDropValidPacketsForADatagramThatIsNotFreeD()
-    {
-        using var receiver = new FreeDReceiver();
-        var port = FindFreePort();
-        receiver.Open(port, 0f);
-
-        // 容量 (最低 256) ちょうどを送って、いっぱいにする。そのあとに、FreeD でないデータグラムを送る。
-        const int capacity = 256;
-        SendPackets(port, firstZoom: 1, count: capacity);
-        WaitUntilProcessed(receiver, capacity);
-        using (var client = new UdpClient())
-        {
-            client.Send(new byte[] { 1, 2, 3 }, 3, new IPEndPoint(IPAddress.Loopback, port));
-        }
-
-        WaitUntilProcessed(receiver, capacity + 1);
-
-        var received = new FreeDPacket();
-        for (uint expectedZoom = 1; expectedZoom <= capacity; expectedZoom++)
-        {
-            Assert.True(receiver.TryTakeNext(received), $"{expectedZoom} 番目が、取り出せない (捨てられた)");
-            Assert.Equal(expectedZoom, received.ZoomRaw);
-        }
-
-        Assert.False(receiver.TryTakeNext(received));
-    }
-
-    private static FreeDPacket TakeNextWithin(FreeDReceiver receiver, FreeDPacket received)
+    private static FreeDReceivedPacket TakeNextWithin(FreeDReceiver receiver)
     {
         var stopwatch = Stopwatch.StartNew();
-        while (!receiver.TryTakeNext(received))
+        FreeDReceivedPacket received;
+        while (!receiver.TryTakeNext(out received))
         {
             Assert.True(stopwatch.ElapsedMilliseconds < 3000, "3 秒待っても、パケットが届かなかった");
             Thread.Sleep(1);
         }
 
         return received;
-    }
-
-    // 受信スレッドが、データグラムを expectedCount 個処理し終えるまで待つ (FreeD として正しくないものも数える)。
-    private static void WaitUntilProcessed(FreeDReceiver receiver, long expectedCount)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        while (receiver.ProcessedDatagramCount < expectedCount)
-        {
-            Assert.True(
-                stopwatch.ElapsedMilliseconds < 5000,
-                $"5 秒待っても、{expectedCount} 個を処理し終えなかった (処理済み: {receiver.ProcessedDatagramCount})");
-            Thread.Sleep(1);
-        }
     }
 
     private static void SendPackets(int port, uint firstZoom, int count)

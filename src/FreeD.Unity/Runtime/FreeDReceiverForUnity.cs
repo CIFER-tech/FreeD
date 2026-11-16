@@ -46,9 +46,9 @@ namespace CIFER.tech.FreeD.Unity
             receiver.Close();
         }
 
-        public bool TryTakeNext(FreeDPacket destination)
+        public bool TryTakeNext(out FreeDReceivedPacket received)
         {
-            return receiver.TryTakeNext(destination);
+            return receiver.TryTakeNext(out received);
         }
     }
 }

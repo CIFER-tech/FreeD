@@ -42,7 +42,7 @@ namespace CIFER.tech.FreeD.Core
         public const uint Unsigned24Max = 0xFFFFFF;
 
         /// <summary>29 バイトを書き込み、書き込んだバイト数を返す。値は 24bit の範囲に飽和させる。</summary>
-        public static int Encode(FreeDPacket p, Span<byte> destination)
+        public static int Encode(in FreeDPacket p, Span<byte> destination)
         {
             if (destination.Length < PacketLength)
             {
@@ -65,10 +65,10 @@ namespace CIFER.tech.FreeD.Core
             return PacketLength;
         }
 
-        /// <summary>復号して、<paramref name="packet"/> に書き込む。確保はしない。長さ・種別・チェックサムが不正なら false で、<paramref name="packet"/> は既定値になる。</summary>
-        public static bool TryDecode(ReadOnlySpan<byte> source, FreeDPacket packet)
+        /// <summary>復号する。長さ・種別・チェックサムが不正なら false。</summary>
+        public static bool TryDecode(ReadOnlySpan<byte> source, out FreeDPacket packet)
         {
-            packet.Clear();
+            packet = default;
             if (source.Length < PacketLength)
             {
                 return false;
