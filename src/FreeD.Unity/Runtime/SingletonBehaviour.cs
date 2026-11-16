@@ -2,12 +2,15 @@ using UnityEngine;
 
 namespace CIFER.tech.FreeD.Unity
 {
-    /// <summary>メインスレッドからだけ呼ぶ。派生クラスが Awake か OnDestroy を持つときは、override して base を呼ぶ。</summary>
+    /// <summary>
+    /// メインスレッドからだけ呼ぶ。派生クラスが Awake か OnDestroy を持つときは、override して base を呼ぶ。
+    /// Instance は、なければ作るので、OnDisable や OnDestroy では呼ばない (シーンを閉じるときに、作ってしまう)。
+    /// </summary>
     public abstract class SingletonBehaviour<T> : MonoBehaviour where T : SingletonBehaviour<T>
     {
         private static T instance;
 
-        /// <summary>登録する側の OnEnable が、Awake より先に走っても使えるよう、なければ作る。</summary>
+        /// <summary>登録する側の OnEnable が、Awake より先に走っても使えるよう、なければ作る。作ると、Awake と OnEnable まで済ませてから返る。</summary>
         public static T Instance
         {
             get
@@ -23,15 +26,6 @@ namespace CIFER.tech.FreeD.Unity
                     instance = new GameObject(typeof(T).Name).AddComponent<T>();
                 }
 
-                return instance;
-            }
-        }
-
-        /// <summary>解除のときに使う。なければ作らない (シーンを閉じるときや終了するときに、作ってしまわないため)。</summary>
-        public static T ExistingInstance
-        {
-            get
-            {
                 return instance;
             }
         }

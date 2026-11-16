@@ -17,6 +17,9 @@ namespace CIFER.tech.FreeD.Unity
 
         private readonly FreeDReceiver receiver = new FreeDReceiver();
 
+        // Instance は、なければ作るので、解除では使えない (シーンを閉じるときに、作ってしまう)。登録した相手を覚えておく。
+        private FreeDManager manager;
+
         public int Port
         {
             get => port;
@@ -37,11 +40,7 @@ namespace CIFER.tech.FreeD.Unity
 
         private void OnEnable()
         {
-            var manager = FreeDManager.Instance;
-            if (manager == null)
-            {
-                return;
-            }
+            manager = FreeDManager.Instance;
 
             // 開いている間は設定を変えられないので、登録 (= Open) の前に渡す。インスペクタの変更は、次に有効になったときから効く。
             receiver.Close();
@@ -53,10 +52,10 @@ namespace CIFER.tech.FreeD.Unity
 
         private void OnDisable()
         {
-            var manager = FreeDManager.ExistingInstance;
             if (manager != null)
             {
                 manager.RemoveReceiver(receiver);
+                manager = null;
             }
 
             // FreeDManager が先に壊れていても、ポートを開けたままにしない。

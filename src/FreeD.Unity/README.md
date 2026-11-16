@@ -93,24 +93,27 @@ public sealed class RecordedReceiver : MonoBehaviour, IFreeDReceiver
     public void Close() { /* 再生を止める */ }
     public bool TryTakeNext(out FreeDReceivedPacket received) { /* 次のパケットを返す */ }
 
+    private FreeDManager manager;
+
     private void OnEnable()
     {
-        FreeDManager.Instance.AddReceiver(this);   // 登録すると、FreeDManager が Open を呼ぶ
+        manager = FreeDManager.Instance;
+        manager.AddReceiver(this);   // 登録すると、FreeDManager が Open を呼ぶ
     }
 
     private void OnDisable()
     {
-        // 解除すると、FreeDManager が Close を呼ぶ。Instance は、なければ作ってしまうので、解除では ExistingInstance を使う。
-        var manager = FreeDManager.ExistingInstance;
+        // 解除すると、FreeDManager が Close を呼ぶ。Instance は、なければ作ってしまうので、登録した相手を覚えておいて使う。
         if (manager != null)
         {
             manager.RemoveReceiver(this);
+            manager = null;
         }
     }
 }
 ```
 
-- `FreeDManager.Instance` は、なければ作る。終了中に呼ぶと、作ってしまうことがあるので、`OnDisable` と `OnDestroy` では、`FreeDManager.ExistingInstance` を使う (なければ作らない)。
+- `FreeDManager.Instance` は、なければ作り、`Awake` と `OnEnable` まで済ませてから返す。シーンを閉じるときや終了するときに、作ってしまうので、`OnDisable` と `OnDestroy` では呼ばない。登録した `FreeDManager` を覚えておいて、解除に使う。
 - singleton の仕組みは、`public` な基底クラス `SingletonBehaviour<T>` にあり、`FreeDManager` が使っている。
 - `ClaimedFields` と `DelaySec` は、`Open` の時点の値で動く。開いている間に変えると、`InvalidOperationException` になる (`FreeDReceiver` の動作)。変えるときは、`Close()`、変更、`Open()` の順に行う。
 - `FreeDReceiverForUnity` のインスペクタの値を、再生中に変えたときは、コンポーネントを無効にして、有効にし直すと反映される。

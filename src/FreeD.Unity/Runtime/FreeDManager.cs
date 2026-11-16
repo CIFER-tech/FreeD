@@ -6,6 +6,7 @@ using UnityEngine;
 namespace CIFER.tech.FreeD.Unity
 {
     [DisallowMultipleComponent]
+    [DefaultExecutionOrder(-1000)]
     public sealed class FreeDManager : SingletonBehaviour<FreeDManager>
     {
         private readonly List<IFreeDReceiver> receivers = new();

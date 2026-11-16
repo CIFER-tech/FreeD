@@ -8,6 +8,9 @@ namespace CIFER.tech.FreeD.Unity
     {
         private const float GizmoArrowLengthM = 0.5f;
 
+        // Instance は、なければ作るので、解除では使えない (シーンを閉じるときに、作ってしまう)。登録した相手を覚えておく。
+        private FreeDManager manager;
+
         [SerializeField] private int cameraId = 1;
         [SerializeField] private Camera camera;
         [SerializeField] private Vector3 rotationScale = Vector3.one;
@@ -114,19 +117,16 @@ namespace CIFER.tech.FreeD.Unity
 
         private void OnEnable()
         {
-            var manager = FreeDManager.Instance;
-            if (manager != null)
-            {
-                manager.AddTracker(this);
-            }
+            manager = FreeDManager.Instance;
+            manager.AddTracker(this);
         }
 
         private void OnDisable()
         {
-            var manager = FreeDManager.ExistingInstance;
             if (manager != null)
             {
                 manager.RemoveTracker(this);
+                manager = null;
             }
         }
 
