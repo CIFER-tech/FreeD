@@ -2,7 +2,7 @@
 
 namespace CIFER.tech.FreeD.Unity
 {
-    public interface IFreeDTracker
+    public interface IFreeDConsumer
     {
         int CameraId { get; }
 

@@ -4,7 +4,7 @@ using UnityEngine;
 namespace CIFER.tech.FreeD.Unity
 {
     [DisallowMultipleComponent]
-    public class FreeDTracker : MonoBehaviour, IFreeDTracker
+    public class FreeDCameraConsumer : MonoBehaviour, IFreeDConsumer
     {
         private const float GizmoArrowLengthM = 0.5f;
 
@@ -69,14 +69,14 @@ namespace CIFER.tech.FreeD.Unity
         private void OnEnable()
         {
             manager = FreeDManager.Instance;
-            manager.AddTracker(this);
+            manager.AddConsumer(this);
         }
 
         private void OnDisable()
         {
             if (manager != null)
             {
-                manager.RemoveTracker(this);
+                manager.RemoveConsumer(this);
                 manager = null;
             }
         }
@@ -97,7 +97,9 @@ namespace CIFER.tech.FreeD.Unity
         }
 
         /// <summary>届いていない項目は値が 0 のままなので、appliedFields の項目だけを反映する。</summary>
-        public void Apply(in FreeDPacket packet, FreeDField appliedFields = FreeDField.All)
+        public void Apply(
+            in FreeDPacket packet,
+            FreeDField appliedFields = FreeDField.Rotation | FreeDField.Position | FreeDField.Zoom | FreeDField.Focus)
         {
             if ((appliedFields & FreeDField.Rotation) != 0)
             {

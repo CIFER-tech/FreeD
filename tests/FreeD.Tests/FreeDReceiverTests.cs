@@ -13,9 +13,9 @@ public class FreeDReceiverTests
     [Fact]
     public void TryTakeNext_ReturnsSentPacketsOldestFirst()
     {
-        using var receiver = new FreeDReceiver();
         var port = FindFreePort();
-        receiver.Open(port, 0f);
+        using var receiver = new FreeDReceiver { Port = port };
+        receiver.Open();
 
         SendPackets(port, firstZoom: 1, count: 3);
 
@@ -28,9 +28,9 @@ public class FreeDReceiverTests
     [Fact]
     public void TryTakeNext_WhenMoreThanCapacityArrive_KeepsOnlyTheNewestCapacity()
     {
-        using var receiver = new FreeDReceiver();
         var port = FindFreePort();
-        receiver.Open(port, 0f);
+        using var receiver = new FreeDReceiver { Port = port };
+        receiver.Open();
 
         // 遅延 0 のときの容量は、FreeDReceiver の最低の数 (256)。
         const int capacity = 256;
@@ -53,9 +53,9 @@ public class FreeDReceiverTests
     [Fact]
     public void TryTakeNext_IgnoresDatagramsThatAreNotFreeD()
     {
-        using var receiver = new FreeDReceiver();
         var port = FindFreePort();
-        receiver.Open(port, 0f);
+        using var receiver = new FreeDReceiver { Port = port };
+        receiver.Open();
 
         using (var client = new UdpClient())
         {
@@ -121,45 +121,32 @@ public class FreeDReceiverTests
     }
 
     [Fact]
-    public void Open_WithPortAndDelaySec_SetsProperties()
-    {
-        var port = FindFreePort();
-        using var receiver = new FreeDReceiver();
-
-        receiver.Open(port, 0f);
-        SendPackets(port, firstZoom: 3, count: 1);
-
-        Assert.Equal(port, receiver.Port);
-        Assert.Equal(3u, TakeNextWithin(receiver).packet.ZoomRaw);
-    }
-
-    [Fact]
-    public void Receiver_CanBeUsedThroughInterface()
+    public void Receiver_CanBeUsedAsProvider()
     {
         var port = FindFreePort();
         using var concrete = new FreeDReceiver { Port = port };
-        IFreeDReceiver receiver = concrete;
-        receiver.ClaimedFields = FreeDField.Zoom;
+        IFreeDProvider provider = concrete;
+        provider.ClaimedFields = FreeDField.Zoom;
 
-        receiver.Open();
+        provider.Open();
         SendPackets(port, firstZoom: 9, count: 1);
 
-        Assert.Equal(FreeDField.Zoom, receiver.ClaimedFields);
-        Assert.Equal(9u, TakeNextWithin(receiver).packet.ZoomRaw);
-        receiver.Close();
+        Assert.Equal(FreeDField.Zoom, provider.ClaimedFields);
+        Assert.Equal(9u, TakeNextWithin(provider).packet.ZoomRaw);
+        provider.Close();
     }
 
-    private static FreeDReceivedPacket TakeNextWithin(IFreeDReceiver receiver)
+    private static FreeDProvidedPacket TakeNextWithin(IFreeDProvider provider)
     {
         var stopwatch = Stopwatch.StartNew();
-        FreeDReceivedPacket received;
-        while (!receiver.TryTakeNext(out received))
+        FreeDProvidedPacket provided;
+        while (!provider.TryTakeNext(out provided))
         {
             Assert.True(stopwatch.ElapsedMilliseconds < 3000, "3 秒待っても、パケットが届かなかった");
             Thread.Sleep(1);
         }
 
-        return received;
+        return provided;
     }
 
     private static void SendPackets(int port, uint firstZoom, int count)

@@ -47,14 +47,14 @@ namespace CIFER.tech.FreeD.Unity
             receiver.Port = port;
             receiver.DelaySec = delaySec;
             receiver.ClaimedFields = claimedFields;
-            manager.AddReceiver(receiver);
+            manager.AddProvider(receiver);
         }
 
         private void OnDisable()
         {
             if (manager != null)
             {
-                manager.RemoveReceiver(receiver);
+                manager.RemoveProvider(receiver);
                 manager = null;
             }
 

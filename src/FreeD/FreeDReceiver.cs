@@ -7,7 +7,7 @@ using CIFER.tech.RingBuffer;
 
 namespace CIFER.tech.FreeD.Core
 {
-    public sealed class FreeDReceiver : IFreeDReceiver, IDisposable
+    public sealed class FreeDReceiver : IFreeDProvider, IDisposable
     {
         // 送信が 60 fps より速くても足りるように、最低限の数と、遅延 1 秒あたりの数 (240 fps 相当) を持つ。
         private const int MinCapacity = 256;
@@ -18,11 +18,11 @@ namespace CIFER.tech.FreeD.Core
 
         private int port = 40000;
         private float delaySec;
-        private FreeDField claimedFields = FreeDField.All;
+        private FreeDField claimedFields = FreeDField.Rotation | FreeDField.Position | FreeDField.Zoom | FreeDField.Focus;
 
         // 受信スレッドで起きた例外。スレッドの外へは投げられないので、TryTakeNext で投げる。
         private volatile Exception? receiveException;
-        private RingBuffer<FreeDReceivedPacket>? buffer;
+        private RingBuffer<FreeDProvidedPacket>? buffer;
         private Socket? socket;
 
         public int Port
@@ -60,21 +60,12 @@ namespace CIFER.tech.FreeD.Core
             Close();
         }
 
-        public void Open(int port, float delaySec)
-        {
-            Close();
-
-            Port = port;
-            DelaySec = delaySec;
-            Open();
-        }
-
         public void Open()
         {
             Close();
 
             receiveException = null;
-            var receivedPackets = new RingBuffer<FreeDReceivedPacket>(MinCapacity + (int)(delaySec * CapacityPerDelaySec));
+            var receivedPackets = new RingBuffer<FreeDProvidedPacket>(MinCapacity + (int)(delaySec * CapacityPerDelaySec));
             buffer = receivedPackets;
 
             var openedSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
@@ -115,7 +106,7 @@ namespace CIFER.tech.FreeD.Core
             }
         }
 
-        private void ReceiveLoop(Socket receivingSocket, RingBuffer<FreeDReceivedPacket> receivedPackets)
+        private void ReceiveLoop(Socket receivingSocket, RingBuffer<FreeDProvidedPacket> receivedPackets)
         {
             var datagram = new byte[DatagramBufferSize];
 
@@ -149,9 +140,9 @@ namespace CIFER.tech.FreeD.Core
 
                 if (FreeDCodec.TryDecode(new ReadOnlySpan<byte>(datagram, 0, length), out var packet))
                 {
-                    receivedPackets.Enqueue(new FreeDReceivedPacket
+                    receivedPackets.Enqueue(new FreeDProvidedPacket
                     {
-                        receivedMs = FreeDClock.NowMs,
+                        timestampMs = FreeDClock.NowMs,
                         packet = packet
                     });
                 }
@@ -159,9 +150,9 @@ namespace CIFER.tech.FreeD.Core
         }
 
         /// <exception cref="InvalidOperationException">受信が途中で失敗して止まったとき。1 回だけ投げる。</exception>
-        public bool TryTakeNext(out FreeDReceivedPacket received)
+        public bool TryTakeNext(out FreeDProvidedPacket provided)
         {
-            received = default;
+            provided = default;
 
             var failure = receiveException;
             if (failure != null)
@@ -176,12 +167,12 @@ namespace CIFER.tech.FreeD.Core
             }
 
             var delayedNowMs = FreeDClock.NowMs - delaySec * 1000d;
-            if (!buffer.TryPeek(out var peeked) || peeked.receivedMs > delayedNowMs)
+            if (!buffer.TryPeek(out var peeked) || peeked.timestampMs > delayedNowMs)
             {
                 return false;
             }
 
-            return buffer.TryDequeue(out received);
+            return buffer.TryDequeue(out provided);
         }
     }
 }

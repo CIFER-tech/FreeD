@@ -9,8 +9,8 @@ namespace CIFER.tech.FreeD.Unity
     [DefaultExecutionOrder(-1000)]
     public sealed class FreeDManager : SingletonBehaviour<FreeDManager>
     {
-        private readonly List<IFreeDReceiver> receivers = new();
-        private readonly List<IFreeDTracker> trackers = new();
+        private readonly List<IFreeDProvider> providers = new();
+        private readonly List<IFreeDConsumer> consumers = new();
         private readonly FreeDMergedCamera[] mergedByCameraId = new FreeDMergedCamera[byte.MaxValue + 1];
 
         // Update で回している間の解除は、要素を詰めると次の要素を飛ばすので、その場では null にして、回し終えてから詰める。
@@ -25,11 +25,11 @@ namespace CIFER.tech.FreeD.Unity
             }
 
             // Open の中で登録が変わっても壊れないよう、写しを回す。まれにしか起きないので、確保は許す。
-            foreach (var receiver in receivers.ToArray())
+            foreach (var provider in providers.ToArray())
             {
-                if (receiver != null && receivers.Contains(receiver))
+                if (provider != null && providers.Contains(provider))
                 {
-                    OpenReceiver(receiver);
+                    OpenProvider(provider);
                 }
             }
         }
@@ -44,8 +44,8 @@ namespace CIFER.tech.FreeD.Unity
             isUpdating = true;
             try
             {
-                UpdateReceivers();
-                UpdateTrackers();
+                UpdateProviders();
+                UpdateConsumers();
             }
             finally
             {
@@ -61,11 +61,11 @@ namespace CIFER.tech.FreeD.Unity
                 return;
             }
 
-            foreach (var receiver in receivers.ToArray())
+            foreach (var provider in providers.ToArray())
             {
-                if (receiver != null && receivers.Contains(receiver))
+                if (provider != null && providers.Contains(provider))
                 {
-                    receiver.Close();
+                    provider.Close();
                 }
             }
 
@@ -74,67 +74,67 @@ namespace CIFER.tech.FreeD.Unity
 
         protected override void OnDestroy()
         {
-            receivers.Clear();
-            trackers.Clear();
+            providers.Clear();
+            consumers.Clear();
             base.OnDestroy();
         }
 
-        public void AddReceiver(IFreeDReceiver receiver)
+        public void AddProvider(IFreeDProvider provider)
         {
-            if (receiver == null || receivers.Contains(receiver))
+            if (provider == null || providers.Contains(provider))
             {
                 return;
             }
 
-            receivers.Add(receiver);
+            providers.Add(provider);
             if (isActiveAndEnabled)
             {
-                OpenReceiver(receiver);
+                OpenProvider(provider);
             }
         }
 
-        public void RemoveReceiver(IFreeDReceiver receiver)
+        public void RemoveProvider(IFreeDProvider provider)
         {
-            var index = receivers.IndexOf(receiver);
+            var index = providers.IndexOf(provider);
             if (index < 0)
             {
                 return;
             }
 
-            RemoveAt(receivers, index);
-            receiver.Close();
+            RemoveAt(providers, index);
+            provider.Close();
 
             // FreeDManager はシーンを切り替えても残るので、担当がいなくなった項目の値を、反映し続けないようにする。
-            var orphanedFields = receiver.ClaimedFields & ~GetClaimedFields();
+            var orphanedFields = provider.ClaimedFields & ~GetClaimedFields();
             for (var i = 0; i < mergedByCameraId.Length; i++)
             {
                 mergedByCameraId[i].receivedFields &= ~orphanedFields;
             }
         }
 
-        public void AddTracker(IFreeDTracker tracker)
+        public void AddConsumer(IFreeDConsumer consumer)
         {
-            if (tracker != null && !trackers.Contains(tracker))
+            if (consumer != null && !consumers.Contains(consumer))
             {
-                trackers.Add(tracker);
+                consumers.Add(consumer);
             }
         }
 
-        public void RemoveTracker(IFreeDTracker tracker)
+        public void RemoveConsumer(IFreeDConsumer consumer)
         {
-            var index = trackers.IndexOf(tracker);
+            var index = consumers.IndexOf(consumer);
             if (index >= 0)
             {
-                RemoveAt(trackers, index);
+                RemoveAt(consumers, index);
             }
         }
 
-        private void OpenReceiver(IFreeDReceiver receiver)
+        private void OpenProvider(IFreeDProvider provider)
         {
-            // ポートを開けない Receiver があっても、残りの Receiver は開く。
+            // ポートを開けないプロバイダがあっても、残りのプロバイダは開く。
             try
             {
-                receiver.Open();
+                provider.Open();
             }
             catch (InvalidOperationException e)
             {
@@ -148,73 +148,73 @@ namespace CIFER.tech.FreeD.Unity
             var claimedFields = FreeDField.None;
             var isOverlapped = false;
 
-            for (var i = 0; i < receivers.Count; i++)
+            for (var i = 0; i < providers.Count; i++)
             {
-                if (receivers[i] == null)
+                if (providers[i] == null)
                 {
                     continue;
                 }
 
-                var receiverFields = receivers[i].ClaimedFields;
-                var overlappedFields = claimedFields & receiverFields;
+                var providerFields = providers[i].ClaimedFields;
+                var overlappedFields = claimedFields & providerFields;
                 if (overlappedFields != FreeDField.None)
                 {
-                    Debug.LogError("FreeD: 同じ項目を複数の Receiver が担当している: " + overlappedFields, this);
+                    Debug.LogError("FreeD: 同じ項目を複数のプロバイダが担当している (各プロバイダの Claimed Fields を確認): " + overlappedFields, this);
                     isOverlapped = true;
                 }
 
-                claimedFields |= receiverFields;
+                claimedFields |= providerFields;
             }
 
             return isOverlapped;
         }
 
-        private void UpdateReceivers()
+        private void UpdateProviders()
         {
             // Apply などの中で登録が変わっても壊れないよう、foreach ではなく for で回す。
             // 回している間に足されたものは、次のフレームから使う (自分を解除して登録し直す実装で、止まらないようにするため)。
-            var receiverCount = receivers.Count;
-            for (var i = 0; i < receiverCount; i++)
+            var providerCount = providers.Count;
+            for (var i = 0; i < providerCount; i++)
             {
-                var receiver = receivers[i];
-                if (receiver == null)
+                var provider = providers[i];
+                if (provider == null)
                 {
                     continue;
                 }
 
                 // 1 つのポートに複数のカメラ ID が届くので、遅延を過ぎたパケットを古い順にすべて合成する。
-                while (receiver.TryTakeNext(out var packet))
+                while (provider.TryTakeNext(out var packet))
                 {
                     // TryTakeNext の中で解除されたら、解除で外した項目を戻さない。再登録されていても、そのフレームでは使わない。
-                    if (receivers[i] != receiver)
+                    if (providers[i] != provider)
                     {
                         break;
                     }
 
                     ref var merged = ref mergedByCameraId[packet.packet.CameraId];
 
-                    merged.packet = FreeDMerger.Merge(merged.packet, ~receiver.ClaimedFields, packet.packet, receiver.ClaimedFields);
+                    merged.packet = FreeDMerger.Merge(merged.packet, ~provider.ClaimedFields, packet.packet, provider.ClaimedFields);
 
-                    // Merge は項目だけを写すので、CameraId は 0 になる。自作の Tracker が Apply の中で読めるよう、戻す。
+                    // Merge は項目だけを写すので、CameraId は 0 になる。自作のコンシューマが Apply の中で読めるよう、戻す。
                     merged.packet.CameraId = packet.packet.CameraId;
-                    merged.receivedFields |= receiver.ClaimedFields;
+                    merged.receivedFields |= provider.ClaimedFields;
                 }
             }
         }
 
-        private void UpdateTrackers()
+        private void UpdateConsumers()
         {
             var claimedFields = GetClaimedFields();
-            var trackerCount = trackers.Count;
-            for (var i = 0; i < trackerCount; i++)
+            var consumerCount = consumers.Count;
+            for (var i = 0; i < consumerCount; i++)
             {
-                var tracker = trackers[i];
-                if (tracker == null)
+                var consumer = consumers[i];
+                if (consumer == null)
                 {
                     continue;
                 }
 
-                var cameraId = tracker.CameraId;
+                var cameraId = consumer.CameraId;
                 if ((uint)cameraId >= (uint)mergedByCameraId.Length)
                 {
                     continue;
@@ -225,7 +225,7 @@ namespace CIFER.tech.FreeD.Unity
                 var appliedFields = merged.receivedFields & claimedFields;
                 if (appliedFields != FreeDField.None)
                 {
-                    tracker.Apply(merged.packet, appliedFields);
+                    consumer.Apply(merged.packet, appliedFields);
                 }
             }
         }
@@ -233,11 +233,11 @@ namespace CIFER.tech.FreeD.Unity
         private FreeDField GetClaimedFields()
         {
             var claimedFields = FreeDField.None;
-            for (var i = 0; i < receivers.Count; i++)
+            for (var i = 0; i < providers.Count; i++)
             {
-                if (receivers[i] != null)
+                if (providers[i] != null)
                 {
-                    claimedFields |= receivers[i].ClaimedFields;
+                    claimedFields |= providers[i].ClaimedFields;
                 }
             }
 
@@ -251,8 +251,8 @@ namespace CIFER.tech.FreeD.Unity
                 return;
             }
 
-            receivers.RemoveAll(static receiver => receiver == null);
-            trackers.RemoveAll(static tracker => tracker == null);
+            providers.RemoveAll(static provider => provider == null);
+            consumers.RemoveAll(static consumer => consumer == null);
             hasRemovedWhileUpdating = false;
         }
 
