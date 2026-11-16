@@ -13,6 +13,10 @@ namespace CIFER.tech.FreeD.Unity
         private readonly List<IFreeDTracker> trackers = new();
         private readonly FreeDMergedCamera[] mergedByCameraId = new FreeDMergedCamera[byte.MaxValue + 1];
 
+        // Update で回している間の解除は、要素を詰めると次の要素を飛ばすので、その場では null にして、回し終えてから詰める。
+        private bool isUpdating;
+        private bool hasRemovedWhileUpdating;
+
         public void AddReceiver(IFreeDReceiver receiver)
         {
             if (receiver == null || receivers.Contains(receiver))
@@ -29,11 +33,13 @@ namespace CIFER.tech.FreeD.Unity
 
         public void RemoveReceiver(IFreeDReceiver receiver)
         {
-            if (!receivers.Remove(receiver))
+            var index = receivers.IndexOf(receiver);
+            if (index < 0)
             {
                 return;
             }
 
+            RemoveAt(receivers, index);
             receiver.Close();
 
             // FreeDManager はシーンを切り替えても残るので、担当がいなくなった項目の値を、反映し続けないようにする。
@@ -54,7 +60,11 @@ namespace CIFER.tech.FreeD.Unity
 
         public void RemoveTracker(IFreeDTracker tracker)
         {
-            trackers.Remove(tracker);
+            var index = trackers.IndexOf(tracker);
+            if (index >= 0)
+            {
+                RemoveAt(trackers, index);
+            }
         }
 
         private void OnEnable()
@@ -66,7 +76,10 @@ namespace CIFER.tech.FreeD.Unity
 
             foreach (var receiver in receivers)
             {
-                OpenReceiver(receiver);
+                if (receiver != null)
+                {
+                    OpenReceiver(receiver);
+                }
             }
         }
 
@@ -79,7 +92,10 @@ namespace CIFER.tech.FreeD.Unity
 
             foreach (var receiver in receivers)
             {
-                receiver.Close();
+                if (receiver != null)
+                {
+                    receiver.Close();
+                }
             }
 
             Array.Clear(mergedByCameraId, 0, mergedByCameraId.Length);
@@ -99,10 +115,29 @@ namespace CIFER.tech.FreeD.Unity
                 return;
             }
 
-            // Tracker の Apply の中で登録が変わっても壊れないよう、foreach ではなく for で回す。
+            isUpdating = true;
+            try
+            {
+                UpdateReceivers();
+                UpdateTrackers();
+            }
+            finally
+            {
+                isUpdating = false;
+                RemoveNullEntries();
+            }
+        }
+
+        private void UpdateReceivers()
+        {
+            // Apply などの中で登録が変わっても壊れないよう、foreach ではなく for で回す。
             for (var i = 0; i < receivers.Count; i++)
             {
                 var receiver = receivers[i];
+                if (receiver == null)
+                {
+                    continue;
+                }
 
                 // 1 つのポートに複数のカメラ ID が届くので、遅延を過ぎたパケットを古い順にすべて合成する。
                 while (receiver.TryTakeNext(out var packet))
@@ -113,10 +148,18 @@ namespace CIFER.tech.FreeD.Unity
                     merged.receivedFields |= receiver.ClaimedFields;
                 }
             }
+        }
 
+        private void UpdateTrackers()
+        {
             for (var i = 0; i < trackers.Count; i++)
             {
                 var tracker = trackers[i];
+                if (tracker == null)
+                {
+                    continue;
+                }
+
                 var cameraId = tracker.CameraId;
                 if ((uint)cameraId >= (uint)mergedByCameraId.Length)
                 {
@@ -129,6 +172,30 @@ namespace CIFER.tech.FreeD.Unity
                     tracker.Apply(merged.packet, merged.receivedFields);
                 }
             }
+        }
+
+        private void RemoveAt<TItem>(List<TItem> items, int index) where TItem : class
+        {
+            if (!isUpdating)
+            {
+                items.RemoveAt(index);
+                return;
+            }
+
+            items[index] = null;
+            hasRemovedWhileUpdating = true;
+        }
+
+        private void RemoveNullEntries()
+        {
+            if (!hasRemovedWhileUpdating)
+            {
+                return;
+            }
+
+            receivers.RemoveAll(static receiver => receiver == null);
+            trackers.RemoveAll(static tracker => tracker == null);
+            hasRemovedWhileUpdating = false;
         }
 
         private void OpenReceiver(IFreeDReceiver receiver)
@@ -149,7 +216,10 @@ namespace CIFER.tech.FreeD.Unity
             var claimedFields = FreeDField.None;
             for (var i = 0; i < receivers.Count; i++)
             {
-                claimedFields |= receivers[i].ClaimedFields;
+                if (receivers[i] != null)
+                {
+                    claimedFields |= receivers[i].ClaimedFields;
+                }
             }
 
             return claimedFields;
@@ -163,6 +233,11 @@ namespace CIFER.tech.FreeD.Unity
 
             for (var i = 0; i < receivers.Count; i++)
             {
+                if (receivers[i] == null)
+                {
+                    continue;
+                }
+
                 var receiverFields = receivers[i].ClaimedFields;
                 var overlappedFields = claimedFields & receiverFields;
                 if (overlappedFields != FreeDField.None)
