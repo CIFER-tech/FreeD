@@ -101,11 +101,13 @@ namespace CIFER.tech.FreeD.Unity
                 return;
             }
 
+            // 閉じると、プロバイダによっては開いた時点とは別の値を返すので、閉じる前に読む。
+            var removedFields = provider.ClaimedFields;
             RemoveAt(providers, index);
             provider.Close();
 
             // FreeDManager はシーンを切り替えても残るので、担当がいなくなった項目の値を、反映し続けないようにする。
-            var orphanedFields = provider.ClaimedFields & ~GetClaimedFields();
+            var orphanedFields = removedFields & ~GetClaimedFields();
             for (var i = 0; i < mergedByCameraId.Length; i++)
             {
                 mergedByCameraId[i].receivedFields &= ~orphanedFields;

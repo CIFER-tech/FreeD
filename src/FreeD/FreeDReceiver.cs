@@ -108,6 +108,19 @@ namespace CIFER.tech.FreeD.Core
 
         private void ReceiveLoop(Socket receivingSocket, RingBuffer<FreeDProvidedPacket> receivedPackets)
         {
+            // 受信スレッドで想定外の例外が出ると、プロセスごと落ちる。TryTakeNext で投げ直すために、必ず受け止める。
+            try
+            {
+                ReceiveUntilClosed(receivingSocket, receivedPackets);
+            }
+            catch (Exception e)
+            {
+                receiveException = new InvalidOperationException("FreeD: 受信に失敗して止まった: " + e.Message, e);
+            }
+        }
+
+        private void ReceiveUntilClosed(Socket receivingSocket, RingBuffer<FreeDProvidedPacket> receivedPackets)
+        {
             var datagram = new byte[DatagramBufferSize];
 
             while (true)
