@@ -70,7 +70,6 @@ namespace CIFER.tech.FreeD.Unity
                 {
                     ref var merged = ref mergedByCameraId[packet.packet.CameraId];
 
-                    // この Receiver の担当項目だけを新しい値にし、残りは今までの値を保つ。
                     merged.packet = FreeDMerger.Merge(merged.packet, ~receiver.Field, packet.packet, receiver.Field);
                     merged.fields |= receiver.Field;
                 }

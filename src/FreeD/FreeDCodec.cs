@@ -3,7 +3,6 @@ using System;
 namespace CIFER.tech.FreeD.Core
 {
     /// <summary>
-    /// FreeD D1 メッセージ (29 バイト) の符号化・復号。
     /// <code>
     /// [0]      0xD1
     /// [1]      カメラ ID
@@ -26,22 +25,19 @@ namespace CIFER.tech.FreeD.Core
         public const int PacketLength = 29;
         public const byte MessageTypeD1 = 0xD1;
 
-        /// <summary>角度 1 度あたりの生の値 (1/32768 度単位)。</summary>
+        /// <summary>生の値は 1/32768 度単位。</summary>
         public const double AngleScale = 32768.0;
 
-        /// <summary>位置 1 m あたりの生の値 (1/64 mm 単位なので 64000)。</summary>
+        /// <summary>生の値は 1/64 mm 単位なので、1 m は 64000。</summary>
         public const double PositionScale = 64.0 * 1000.0;
 
-        /// <summary>角度・位置の生の値の最小 (24bit 符号付き)。</summary>
         public const int Signed24Min = -8388608;
 
-        /// <summary>角度・位置の生の値の最大 (24bit 符号付き)。</summary>
         public const int Signed24Max = 8388607;
 
-        /// <summary>ズーム・フォーカスの生の値の最大 (24bit 符号なし)。</summary>
         public const uint Unsigned24Max = 0xFFFFFF;
 
-        /// <summary>29 バイトを書き込み、書き込んだバイト数を返す。値は 24bit の範囲に飽和させる。</summary>
+        /// <summary>範囲を超える値は、24bit の範囲に飽和させる。</summary>
         public static int Encode(in FreeDPacket p, Span<byte> destination)
         {
             if (destination.Length < PacketLength)
@@ -65,7 +61,6 @@ namespace CIFER.tech.FreeD.Core
             return PacketLength;
         }
 
-        /// <summary>復号する。長さ・種別・チェックサムが不正なら false。</summary>
         public static bool TryDecode(ReadOnlySpan<byte> source, out FreeDPacket packet)
         {
             packet = default;
@@ -97,7 +92,6 @@ namespace CIFER.tech.FreeD.Core
             return true;
         }
 
-        /// <summary>先頭 28 バイトからチェックサムを求める: (0x40 − 総和) mod 256。</summary>
         public static byte Checksum(ReadOnlySpan<byte> bytesBeforeChecksum)
         {
             var sum = 0;
