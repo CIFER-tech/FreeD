@@ -74,9 +74,10 @@ namespace CIFER.tech.FreeD.Unity
                 return;
             }
 
-            foreach (var receiver in receivers)
+            // Open の中で登録が変わっても壊れないよう、写しを回す。まれにしか起きないので、確保は許す。
+            foreach (var receiver in receivers.ToArray())
             {
-                if (receiver != null)
+                if (receiver != null && receivers.Contains(receiver))
                 {
                     OpenReceiver(receiver);
                 }
@@ -90,9 +91,9 @@ namespace CIFER.tech.FreeD.Unity
                 return;
             }
 
-            foreach (var receiver in receivers)
+            foreach (var receiver in receivers.ToArray())
             {
-                if (receiver != null)
+                if (receiver != null && receivers.Contains(receiver))
                 {
                     receiver.Close();
                 }
