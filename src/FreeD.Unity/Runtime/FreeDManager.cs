@@ -161,6 +161,7 @@ namespace CIFER.tech.FreeD.Unity
 
         private void UpdateTrackers()
         {
+            var claimedFields = GetClaimedFields();
             var trackerCount = trackers.Count;
             for (var i = 0; i < trackerCount; i++)
             {
@@ -176,10 +177,12 @@ namespace CIFER.tech.FreeD.Unity
                     continue;
                 }
 
+                // 登録したまま設定を変えて、担当でなくなった項目は、前の値を反映し続けない。
                 ref var merged = ref mergedByCameraId[cameraId];
-                if (merged.receivedFields != FreeDField.None)
+                var appliedFields = merged.receivedFields & claimedFields;
+                if (appliedFields != FreeDField.None)
                 {
-                    tracker.Apply(merged.packet, merged.receivedFields);
+                    tracker.Apply(merged.packet, appliedFields);
                 }
             }
         }
