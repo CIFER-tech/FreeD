@@ -8,80 +8,196 @@ namespace CIFER.tech.FreeD.Unity
     [DisallowMultipleComponent]
     public sealed class FreeDManager : MonoBehaviour
     {
-        private readonly List<FreeDReceiverForUnity> receivers = new();
-        private readonly List<FreeDTracker> trackers = new();
+        private static FreeDManager instance;
+        private static bool isQuitting;
+
+        private readonly List<IFreeDReceiver> receivers = new();
+        private readonly List<IFreeDTracker> trackers = new();
         private readonly FreeDMergedCamera[] mergedByCameraId = new FreeDMergedCamera[byte.MaxValue + 1];
 
-        private void OnEnable()
+        /// <summary>Receiver や Tracker の OnEnable が、FreeDManager の Awake より先に走っても登録できるよう、なければ作る。</summary>
+        public static FreeDManager Instance
         {
-#if UNITY_6000_5_OR_NEWER
-            receivers.AddRange(FindObjectsByType<FreeDReceiverForUnity>(FindObjectsInactive.Include));
-            trackers.AddRange(FindObjectsByType<FreeDTracker>(FindObjectsInactive.Include));
-#elif UNITY_2022_2_OR_NEWER
-            receivers.AddRange(FindObjectsByType<FreeDReceiverForUnity>(FindObjectsInactive.Include, FindObjectsSortMode.None));
-            trackers.AddRange(FindObjectsByType<FreeDTracker>(FindObjectsInactive.Include, FindObjectsSortMode.None));
-#else
-            receivers.AddRange(FindObjectsOfType<FreeDReceiverForUnity>(true));
-            trackers.AddRange(FindObjectsOfType<FreeDTracker>(true));
-#endif
-
-            // 控えとして無効にしてある Receiver は、受信にも項目の重なりの検査にも使わない。
-            receivers.RemoveAll(receiver => !receiver.isActiveAndEnabled);
-
-            foreach (var receiver in receivers)
+            get
             {
-                // ポートを開けない Receiver があっても、残りの Receiver は開く。
-                try
+                if (instance != null)
                 {
-                    receiver.Open();
+                    return instance;
                 }
-                catch (InvalidOperationException e)
+
+                // 終了中に作ると、作ったものがシーンに残る。
+                if (isQuitting)
                 {
-                    Debug.LogException(e, receiver);
+                    return null;
                 }
+
+                instance = FindExistingInstance();
+                if (instance == null)
+                {
+                    instance = new GameObject(nameof(FreeDManager)).AddComponent<FreeDManager>();
+                }
+
+                return instance;
             }
         }
 
-        private void OnDisable()
+        /// <summary>解除のときに使う。なければ作らない (シーンを閉じるときに、作ってしまわないため)。</summary>
+        public static FreeDManager ExistingInstance
         {
-            foreach (var receiver in receivers)
+            get
+            {
+                return instance;
+            }
+        }
+
+        public void AddReceiver(IFreeDReceiver receiver)
+        {
+            if (receiver == null || receivers.Contains(receiver))
+            {
+                return;
+            }
+
+            receivers.Add(receiver);
+            if (isActiveAndEnabled)
+            {
+                OpenReceiver(receiver);
+            }
+        }
+
+        public void RemoveReceiver(IFreeDReceiver receiver)
+        {
+            if (receivers.Remove(receiver))
             {
                 receiver.Close();
             }
-
-            Array.Clear(mergedByCameraId, 0, mergedByCameraId.Length);
-            receivers.Clear();
-            trackers.Clear();
         }
 
-        private void Update()
+        public void AddTracker(IFreeDTracker tracker)
         {
-            CloseDestroyedReceivers();
+            if (tracker != null && !trackers.Contains(tracker))
+            {
+                trackers.Add(tracker);
+            }
+        }
 
-            if (HasOverlappedField())
+        public void RemoveTracker(IFreeDTracker tracker)
+        {
+            trackers.Remove(tracker);
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticState()
+        {
+            // ドメインのリロードなしで再生すると、前の再生の値が残る。
+            instance = null;
+            isQuitting = false;
+            Application.quitting -= OnApplicationQuitting;
+            Application.quitting += OnApplicationQuitting;
+        }
+
+        private static void OnApplicationQuitting()
+        {
+            isQuitting = true;
+        }
+
+        private static FreeDManager FindExistingInstance()
+        {
+#if UNITY_6000_5_OR_NEWER
+            var found = FindObjectsByType<FreeDManager>(FindObjectsInactive.Include);
+#elif UNITY_2022_2_OR_NEWER
+            var found = FindObjectsByType<FreeDManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+#else
+            var found = FindObjectsOfType<FreeDManager>(true);
+#endif
+            return found.Length > 0 ? found[0] : null;
+        }
+
+        private void Awake()
+        {
+            if (instance != null && instance != this)
+            {
+                Debug.LogWarning("FreeD: FreeDManager が複数ある。あとのものを壊す", this);
+                Destroy(this);
+                return;
+            }
+
+            instance = this;
+
+            // DontDestroyOnLoad は、ルートの GameObject にしか効かない。
+            if (transform.parent != null)
+            {
+                Debug.LogWarning("FreeD: FreeDManager をルートの GameObject に置かないと、シーンの切り替えで壊れる", this);
+                return;
+            }
+
+            DontDestroyOnLoad(gameObject);
+        }
+
+        private void OnEnable()
+        {
+            if (instance != this)
             {
                 return;
             }
 
             foreach (var receiver in receivers)
             {
+                OpenReceiver(receiver);
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (instance != this)
+            {
+                return;
+            }
+
+            foreach (var receiver in receivers)
+            {
+                receiver.Close();
+            }
+
+            Array.Clear(mergedByCameraId, 0, mergedByCameraId.Length);
+        }
+
+        private void OnDestroy()
+        {
+            if (instance != this)
+            {
+                return;
+            }
+
+            receivers.Clear();
+            trackers.Clear();
+            instance = null;
+        }
+
+        private void Update()
+        {
+            if (HasOverlappedField())
+            {
+                return;
+            }
+
+            // Tracker の Apply の中で登録が変わっても壊れないよう、foreach ではなく for で回す。
+            for (var i = 0; i < receivers.Count; i++)
+            {
+                var receiver = receivers[i];
+
                 // 1 つのポートに複数のカメラ ID が届くので、遅延を過ぎたパケットを古い順にすべて合成する。
                 while (receiver.TryTakeNext(out var packet))
                 {
                     ref var merged = ref mergedByCameraId[packet.packet.CameraId];
 
-                    merged.packet = FreeDMerger.Merge(merged.packet, ~receiver.Field, packet.packet, receiver.Field);
-                    merged.fields |= receiver.Field;
+                    merged.packet = FreeDMerger.Merge(merged.packet, ~receiver.ClaimedFields, packet.packet, receiver.ClaimedFields);
+                    merged.receivedFields |= receiver.ClaimedFields;
                 }
             }
 
-            foreach (var tracker in trackers)
+            for (var i = 0; i < trackers.Count; i++)
             {
-                if (tracker == null || !tracker.isActiveAndEnabled)
-                {
-                    continue;
-                }
-
+                var tracker = trackers[i];
                 var cameraId = tracker.CameraId;
                 if ((uint)cameraId >= (uint)mergedByCameraId.Length)
                 {
@@ -89,26 +205,23 @@ namespace CIFER.tech.FreeD.Unity
                 }
 
                 ref var merged = ref mergedByCameraId[cameraId];
-                if (merged.fields != FreeDField.None)
+                if (merged.receivedFields != FreeDField.None)
                 {
-                    tracker.Apply(merged.packet, merged.fields);
+                    tracker.Apply(merged.packet, merged.receivedFields);
                 }
             }
         }
 
-        /// <summary>シーンのアンロードなどで壊された Receiver は、受信を止めて、一覧から外す。</summary>
-        private void CloseDestroyedReceivers()
+        private void OpenReceiver(IFreeDReceiver receiver)
         {
-            for (var i = receivers.Count - 1; i >= 0; i--)
+            // ポートを開けない Receiver があっても、残りの Receiver は開く。
+            try
             {
-                var receiver = receivers[i];
-                if (receiver != null)
-                {
-                    continue;
-                }
-
-                receiver.Close();
-                receivers.RemoveAt(i);
+                receiver.Open();
+            }
+            catch (InvalidOperationException e)
+            {
+                Debug.LogException(e, this);
             }
         }
 
@@ -118,16 +231,17 @@ namespace CIFER.tech.FreeD.Unity
             var claimedFields = FreeDField.None;
             var isOverlapped = false;
 
-            foreach (var receiver in receivers)
+            for (var i = 0; i < receivers.Count; i++)
             {
-                var overlappedFields = claimedFields & receiver.Field;
+                var receiverFields = receivers[i].ClaimedFields;
+                var overlappedFields = claimedFields & receiverFields;
                 if (overlappedFields != FreeDField.None)
                 {
                     Debug.LogError("FreeD: 同じ項目を複数の Receiver が担当している: " + overlappedFields, this);
                     isOverlapped = true;
                 }
 
-                claimedFields |= receiver.Field;
+                claimedFields |= receiverFields;
             }
 
             return isOverlapped;
