@@ -60,15 +60,6 @@ namespace CIFER.tech.FreeD.Core
             Close();
         }
 
-        public void Open(int port, float delaySec)
-        {
-            Close();
-
-            Port = port;
-            DelaySec = delaySec;
-            Open();
-        }
-
         public void Open()
         {
             Close();
