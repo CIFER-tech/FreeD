@@ -8,6 +8,8 @@ namespace CIFER.tech.FreeD.Tests;
 
 public class FreeDReceiverTests
 {
+    private const int ReceiveSettleMs = 500;
+
     [Fact]
     public void TryTakeNext_ReturnsSentPacketsOldestFirst()
     {
@@ -24,35 +26,28 @@ public class FreeDReceiverTests
     }
 
     [Fact]
-    public void TryTakeNext_WhenMoreThanCapacityArrive_KeepsTheNewestAndNeverFails()
+    public void TryTakeNext_WhenMoreThanCapacityArrive_KeepsOnlyTheNewestCapacity()
     {
         using var receiver = new FreeDReceiver();
         var port = FindFreePort();
         receiver.Open(port, 0f);
 
-        // 容量 (最低 256) を超える数を、取り出さずに送る。古いものは捨てられる。
+        // 遅延 0 のときの容量は、FreeDReceiver の最低の数 (256)。
+        const int capacity = 256;
         const int sentCount = 1000;
         SendPackets(port, firstZoom: 1, count: sentCount);
 
-        uint last = 0;
-        var takenCount = 0;
-        var stopwatch = Stopwatch.StartNew();
-        while (last < sentCount)
-        {
-            Assert.True(stopwatch.ElapsedMilliseconds < 5000, $"5 秒待っても、最後のパケットが届かなかった (最後に取り出した値: {last})");
-            if (!receiver.TryTakeNext(out var received))
-            {
-                Thread.Sleep(1);
-                continue;
-            }
+        // 取り出しが受信の最中に始まると、あふれずに全部取れてしまうので、受信が終わるのを待ってから取り出す。
+        Thread.Sleep(ReceiveSettleMs);
 
-            Assert.True(received.packet.ZoomRaw > last, $"古い順に取り出せていない: {last} のあとに {received.packet.ZoomRaw}");
-            last = received.packet.ZoomRaw;
-            takenCount++;
+        var takenZooms = new List<uint>();
+        while (receiver.TryTakeNext(out var received))
+        {
+            takenZooms.Add(received.packet.ZoomRaw);
         }
 
-        Assert.Equal((uint)sentCount, last);
-        Assert.InRange(takenCount, 1, sentCount);
+        var expectedZooms = Enumerable.Range(sentCount - capacity + 1, capacity).Select(zoom => (uint)zoom).ToList();
+        Assert.Equal(expectedZooms, takenZooms);
     }
 
     [Fact]
