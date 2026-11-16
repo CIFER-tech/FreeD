@@ -3,10 +3,7 @@ using UnityEngine;
 
 namespace CIFER.tech.FreeD.Unity
 {
-    /// <summary>
-    /// FreeD (UDP) をポート 1 つで受信する。送り元のポートごとに 1 つ置き、Field でそのポートから使う項目を選ぶ。
-    /// 受信の開始・停止とパケットの取り出しは FreeDManager が行う。Unity のライフイベントは使わない。
-    /// </summary>
+    /// <summary>受信の開始・停止とパケットの取り出しは FreeDManager が行うので、Unity のライフイベントは使わない。</summary>
     public sealed class FreeDReceiverForUnity : MonoBehaviour
     {
         [SerializeField] private int port = 40000;
@@ -40,7 +37,7 @@ namespace CIFER.tech.FreeD.Unity
             receiver.Open(port, delaySec);
         }
 
-        /// <summary>受信を止める。このコンポーネントが消えたあとでも呼べる。</summary>
+        /// <summary>このコンポーネントが壊されたあとでも呼べる。</summary>
         public void Close()
         {
             receiver.Close();

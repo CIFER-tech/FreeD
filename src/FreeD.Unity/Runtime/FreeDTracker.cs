@@ -63,9 +63,7 @@ namespace CIFER.tech.FreeD.Unity
             set => focusToDistanceM = value;
         }
 
-        /// <summary>
-        /// field の項目だけを反映する。このカメラ ID で、まだ届いていない項目は値が 0 のままなので、反映しない。
-        /// </summary>
+        /// <summary>届いていない項目は値が 0 のままなので、field の項目だけを反映する。</summary>
         public void Apply(in FreeDPacket packet, FreeDField field = FreeDField.All)
         {
             if ((field & FreeDField.Rotation) != 0)
