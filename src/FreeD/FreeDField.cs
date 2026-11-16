@@ -2,7 +2,6 @@ using System;
 
 namespace CIFER.tech.FreeD.Core
 {
-    /// <summary>合成の対象になる項目。ストリームごとに、どの項目を使うかを選ぶ。</summary>
     [Flags]
     public enum FreeDField
     {

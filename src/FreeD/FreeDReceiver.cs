@@ -109,7 +109,6 @@ namespace CIFER.tech.FreeD.Core
             }
         }
 
-        /// <summary>遅延を過ぎたパケットのうち、最も古い 1 つを取り出す。なければ false。</summary>
         /// <exception cref="InvalidOperationException">受信が途中で失敗して止まったとき。1 回だけ投げる。</exception>
         public bool TryTakeNext(out FreeDReceivedPacket received)
         {
