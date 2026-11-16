@@ -38,7 +38,7 @@ namespace CIFER.tech.FreeD.Unity
 
         public float DelaySec
         {
-            get => delaySec;
+            get => isOpen ? receiver.DelaySec : delaySec;
             set
             {
                 ThrowIfOpen();
@@ -46,9 +46,10 @@ namespace CIFER.tech.FreeD.Unity
             }
         }
 
+        // 開いている間にインスペクタで変えても、FreeDManager には、開いた時点の値を見せる。
         public FreeDField ClaimedFields
         {
-            get => claimedFields;
+            get => isOpen ? receiver.ClaimedFields : claimedFields;
             set
             {
                 ThrowIfOpen();
