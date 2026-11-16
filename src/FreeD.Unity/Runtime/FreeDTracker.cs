@@ -63,38 +63,51 @@ namespace CIFER.tech.FreeD.Unity
             set => focusToDistanceM = value;
         }
 
-        public void Apply(in FreeDPacket packet)
+        /// <summary>
+        /// field の項目だけを反映する。このカメラ ID で、まだ届いていない項目は値が 0 のままなので、反映しない。
+        /// </summary>
+        public void Apply(in FreeDPacket packet, FreeDField field = FreeDField.All)
         {
-            // FreeD 座標 (X=右, Y=前, Z=上, m) での姿勢。
-            // 回転は Rz(パン) · Rx(チルト) · Ry(ロール)。角度の正の向きは送信機器の仕様によるので、向きが逆なら rotationScale で反転する。
-            // 回転を担当する Receiver がないときは角度が 0 なので、単位回転になる。
-            var freeDRotation =
-                Quaternion.AngleAxis((float)packet.PanDegrees * rotationScale.x, Vector3.forward)
-                * Quaternion.AngleAxis((float)packet.TiltDegrees * rotationScale.y, Vector3.right)
-                * Quaternion.AngleAxis((float)packet.RollDegrees * rotationScale.z, Vector3.up);
+            if ((field & FreeDField.Rotation) != 0)
+            {
+                // FreeD 座標 (X=右, Y=前, Z=上, m) での姿勢。
+                // 回転は Rz(パン) · Rx(チルト) · Ry(ロール)。角度の正の向きは送信機器の仕様によるので、向きが逆なら rotationScale で反転する。
+                var freeDRotation =
+                    Quaternion.AngleAxis((float)packet.PanDegrees * rotationScale.x, Vector3.forward)
+                    * Quaternion.AngleAxis((float)packet.TiltDegrees * rotationScale.y, Vector3.right)
+                    * Quaternion.AngleAxis((float)packet.RollDegrees * rotationScale.z, Vector3.up);
 
-            // FreeD の (X, Y, Z) を Unity の (x, z, y) に入れ替える。Y と Z の入れ替えで左右の手系が変わるので、回転の向きも反転する。
-            var unityPosition = new Vector3(
-                (float)packet.XMeters * positionScale.x,
-                (float)packet.ZMeters * positionScale.z,
-                (float)packet.YMeters * positionScale.y);
-            var unityRotation = new Quaternion(-freeDRotation.x, -freeDRotation.z, -freeDRotation.y,
-                freeDRotation.w);
+                // FreeD の (X, Y, Z) を Unity の (x, z, y) に入れ替える。Y と Z の入れ替えで左右の手系が変わるので、回転の向きも反転する。
+                var unityRotation = new Quaternion(-freeDRotation.x, -freeDRotation.z, -freeDRotation.y,
+                    freeDRotation.w);
+                transform.localRotation = unityRotation * Quaternion.Euler(rotationOffset);
+            }
 
-            // オフセットは Unity のカメラのローカル軸で適用する。
-            transform.localPosition = unityPosition + unityRotation * positionOffset;
-            transform.localRotation = unityRotation * Quaternion.Euler(rotationOffset);
+            if ((field & FreeDField.Position) != 0)
+            {
+                var unityPosition = new Vector3(
+                    (float)packet.XMeters * positionScale.x,
+                    (float)packet.ZMeters * positionScale.z,
+                    (float)packet.YMeters * positionScale.y);
+
+                // オフセットは Unity のカメラのローカル軸で適用する。
+                // 向きは先に反映してあるので、今の向きから向きのオフセットを除けば、向きが届いていないときも使える。
+                var offsetRotation = transform.localRotation * Quaternion.Inverse(Quaternion.Euler(rotationOffset));
+                transform.localPosition = unityPosition + offsetRotation * positionOffset;
+            }
 
             if (camera != null)
             {
-                if (zoomToFocalLengthMm.length > 0)
+                if ((field & FreeDField.Zoom) != 0 && zoomToFocalLengthMm.length > 0)
                 {
                     camera.usePhysicalProperties = true;
                     camera.focalLength = zoomToFocalLengthMm.Evaluate(packet.ZoomRaw);
                 }
+
 #if UNITY_2022_2_OR_NEWER
-                if (focusToDistanceM.length > 0)
+                if ((field & FreeDField.Focus) != 0 && focusToDistanceM.length > 0)
                 {
+                    camera.usePhysicalProperties = true;
                     camera.focusDistance = focusToDistanceM.Evaluate(packet.FocusRaw);
                 }
 #endif

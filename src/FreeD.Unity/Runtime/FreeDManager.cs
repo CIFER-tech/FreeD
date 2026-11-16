@@ -10,7 +10,7 @@ namespace CIFER.tech.FreeD.Unity
     {
         private readonly List<FreeDReceiverForUnity> receivers = new();
         private readonly List<FreeDTracker> trackers = new();
-        private readonly Dictionary<int, FreeDPacket> mergedPackets = new();
+        private readonly FreeDMergedCamera[] mergedByCameraId = new FreeDMergedCamera[byte.MaxValue + 1];
 
         private void OnEnable()
         {
@@ -49,7 +49,7 @@ namespace CIFER.tech.FreeD.Unity
                 receiver.Close();
             }
 
-            mergedPackets.Clear();
+            Array.Clear(mergedByCameraId, 0, mergedByCameraId.Length);
             receivers.Clear();
             trackers.Clear();
         }
@@ -68,12 +68,11 @@ namespace CIFER.tech.FreeD.Unity
                 // 1 つのポートに複数のカメラ ID が届くので、遅延を過ぎたパケットを古い順にすべて合成する。
                 while (receiver.TryTakeNext(out var packet))
                 {
-                    var cameraId = packet.packet.CameraId;
-                    mergedPackets.TryGetValue(cameraId, out var mergedPacket);
+                    ref var merged = ref mergedByCameraId[packet.packet.CameraId];
 
                     // この Receiver の担当項目だけを新しい値にし、残りは今までの値を保つ。
-                    mergedPackets[cameraId] =
-                        FreeDMerger.Merge(mergedPacket, ~receiver.Field, packet.packet, receiver.Field);
+                    merged.packet = FreeDMerger.Merge(merged.packet, ~receiver.Field, packet.packet, receiver.Field);
+                    merged.fields |= receiver.Field;
                 }
             }
 
@@ -84,9 +83,16 @@ namespace CIFER.tech.FreeD.Unity
                     continue;
                 }
 
-                if (mergedPackets.TryGetValue(tracker.CameraId, out var mergedPacket))
+                var cameraId = tracker.CameraId;
+                if ((uint)cameraId >= (uint)mergedByCameraId.Length)
                 {
-                    tracker.Apply(mergedPacket);
+                    continue;
+                }
+
+                ref var merged = ref mergedByCameraId[cameraId];
+                if (merged.fields != FreeDField.None)
+                {
+                    tracker.Apply(merged.packet, merged.fields);
                 }
             }
         }
