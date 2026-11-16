@@ -69,7 +69,7 @@ FreeDPacket merged = FreeDMerger.Merge(
 ## 普通の .NET アプリで使う
 
 ソースは `src/FreeD/` にある (netstandard2.1、名前空間は `CIFER.tech.FreeD.Core`)。符号化・復号・合成と、UDP の受信 (`FreeDReceiver`) を持つ。受信は RingBuffer ([`CIFER.tech.RingBuffer`](https://github.com/CIFER-tech/RingBuffer)) を使う。
-`FreeDReceiver` は `IFreeDReceiver` を実装する。`Port`・`DelaySec`・`ClaimedFields` を設定してから `Open()` する。開いている間は、これらを変えられない (`InvalidOperationException`)。変えるときは、`Close()` してから変えて、`Open()` し直す。
+`FreeDReceiver` は `IFreeDProvider` を実装する。`Port`・`DelaySec`・`ClaimedFields` を設定してから `Open()` する。開いている間は、これらを変えられない (`InvalidOperationException`)。変えるときは、`Close()` してから変えて、`Open()` し直す。
 
 タグ (`v*`) を付けると、GitHub Actions が `.nupkg` を作って、GitHub の Releases に添付する。nuget.org には公開しない。取り出した `.nupkg` を置いたフォルダを、NuGet のローカルのソースにして使う (RingBuffer の `.nupkg` も同じ方法で取り出す)。
 

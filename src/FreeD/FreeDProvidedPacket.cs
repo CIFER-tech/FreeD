@@ -1,8 +1,8 @@
 namespace CIFER.tech.FreeD.Core
 {
-    public struct FreeDReceivedPacket
+    public struct FreeDProvidedPacket
     {
-        public double receivedMs;
+        public double timestampMs;
         public FreeDPacket packet;
     }
 }

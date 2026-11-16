@@ -71,7 +71,7 @@ Model と View は、`OnEnable` と `OnDisable` で、`FreeDManager` に登録�
 姿勢とレンズ (ズーム・フォーカス) が別々のポートで届くときは、`FreeDReceiverForUnity` をポートごとに置き、使う項目を選ぶ。
 
 1. `FreeDReceiverForUnity` を 2 つ置く。1 つ目: `Port` 40000、`Claimed Fields` で `Position` と `Rotation` だけ選ぶ。2 つ目: `Port` 41000、`Claimed Fields` で `Zoom` と `Focus` だけ選ぶ。
-2. 同じ項目は 1 つの Receiver だけが使える。重なっていると、Manager がエラーを出して、反映を行わない。
+2. 同じ項目は 1 つのプロバイダ (Receiver) だけが使える。重なっていると、Manager がエラーを出して、反映を行わない。
 3. 項目ごとに、その Receiver で最後に届いた値を使う。途切れても値は保たれる。
 4. 映像とのずれは、早く届く側の Receiver の `Delay Sec` (秒) で合わせる (その分だけ反映を遅らせる)。
 5. 合成はカメラ ID ごとに行う。姿勢とレンズを 1 台のカメラにまとめるには、どちらの送信元も同じカメラ ID で送る。
@@ -79,12 +79,12 @@ Model と View は、`OnEnable` と `OnDisable` で、`FreeDManager` に登録�
 
 2.0.0 より前のシーン (カメラに `FreeDReceiver` を付けていたもの) は、上の手順で組み直す。
 
-### 自作の Receiver や Tracker を差し込む
+### 自作のプロバイダや Tracker を差し込む
 
-`IFreeDReceiver` (受信) と `IFreeDTracker` (反映) を実装して、`FreeDManager.Instance` に登録すると、`FreeDReceiverForUnity` や `FreeDTracker` の代わりに使える。たとえば、UDP ではなく、録画を再生する Receiver を作れる。
+`IFreeDProvider` (パケットの提供) と `IFreeDTracker` (反映) を実装して、`FreeDManager.Instance` に登録すると、`FreeDReceiverForUnity` や `FreeDTracker` の代わりに使える。たとえば、UDP ではなく、録画を再生するプロバイダを作れる。
 
 ```csharp
-public sealed class RecordedReceiver : MonoBehaviour, IFreeDReceiver
+public sealed class RecordedProvider : MonoBehaviour, IFreeDProvider
 {
     public FreeDField ClaimedFields { get; set; } =
         FreeDField.Rotation | FreeDField.Position | FreeDField.Zoom | FreeDField.Focus;
@@ -92,14 +92,14 @@ public sealed class RecordedReceiver : MonoBehaviour, IFreeDReceiver
 
     public void Open() { /* 再生を始める */ }
     public void Close() { /* 再生を止める */ }
-    public bool TryTakeNext(out FreeDReceivedPacket received) { /* 次のパケットを返す */ }
+    public bool TryTakeNext(out FreeDProvidedPacket provided) { /* 次のパケットを返す */ }
 
     private FreeDManager manager;
 
     private void OnEnable()
     {
         manager = FreeDManager.Instance;
-        manager.AddReceiver(this);   // 登録すると、FreeDManager が Open を呼ぶ
+        manager.AddProvider(this);   // 登録すると、FreeDManager が Open を呼ぶ
     }
 
     private void OnDisable()
@@ -107,7 +107,7 @@ public sealed class RecordedReceiver : MonoBehaviour, IFreeDReceiver
         // 解除すると、FreeDManager が Close を呼ぶ。Instance は、なければ作ってしまうので、登録した相手を覚えておいて使う。
         if (manager != null)
         {
-            manager.RemoveReceiver(this);
+            manager.RemoveProvider(this);
             manager = null;
         }
     }
@@ -118,7 +118,7 @@ public sealed class RecordedReceiver : MonoBehaviour, IFreeDReceiver
 - singleton の仕組みは、`public` な基底クラス `SingletonBehaviour<T>` にあり、`FreeDManager` が使っている。
 - `ClaimedFields` と `DelaySec` は、`Open` の時点の値で動く。開いている間に変えると、`InvalidOperationException` になる (`FreeDReceiver` の動作)。変えるときは、`Close()`、変更、`Open()` の順に行う。
 - `FreeDReceiverForUnity` のインスペクタの値を、再生中に変えたときは、コンポーネントを無効にして、有効にし直すと反映される。
-- ポート番号は、`IFreeDReceiver` に含めない。ポートを持つのは、`FreeDReceiver` の `Port` だけ。
+- ポート番号は、`IFreeDProvider` に含めない。ポートを持つのは、`FreeDReceiver` の `Port` だけ。
 
 ## ソースの置き場所について
 

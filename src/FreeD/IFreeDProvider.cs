@@ -4,7 +4,7 @@ namespace CIFER.tech.FreeD.Core
     /// ClaimedFields と DelaySec は、Open の時点の値で動く。開いている間に変えると InvalidOperationException になるので、
     /// 変えるときは、Close してから変えて、Open し直す。
     /// </summary>
-    public interface IFreeDReceiver
+    public interface IFreeDProvider
     {
         FreeDField ClaimedFields { get; set; }
 
@@ -14,6 +14,6 @@ namespace CIFER.tech.FreeD.Core
 
         void Close();
 
-        bool TryTakeNext(out FreeDReceivedPacket received);
+        bool TryTakeNext(out FreeDProvidedPacket provided);
     }
 }
