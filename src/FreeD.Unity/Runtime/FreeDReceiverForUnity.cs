@@ -1,4 +1,5 @@
-﻿using CIFER.tech.FreeD.Core;
+﻿using System;
+using CIFER.tech.FreeD.Core;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -23,22 +24,36 @@ namespace CIFER.tech.FreeD.Unity
         // Instance は、なければ作るので、解除では使えない (シーンを閉じるときに、作ってしまう)。登録した相手を覚えておく。
         private FreeDManager manager;
 
+        private bool isOpen;
+
         public int Port
         {
             get => port;
-            set => port = value;
+            set
+            {
+                ThrowIfOpen();
+                port = value;
+            }
         }
 
         public float DelaySec
         {
             get => delaySec;
-            set => delaySec = value;
+            set
+            {
+                ThrowIfOpen();
+                delaySec = value;
+            }
         }
 
         public FreeDField ClaimedFields
         {
             get => claimedFields;
-            set => claimedFields = value;
+            set
+            {
+                ThrowIfOpen();
+                claimedFields = value;
+            }
         }
 
         private void OnEnable()
@@ -56,27 +71,37 @@ namespace CIFER.tech.FreeD.Unity
             }
 
             // FreeDManager が先に壊れていても、ポートを開けたままにしない。
-            receiver.Close();
+            Close();
         }
 
         public void Open()
         {
             // 開いている間は設定を変えられないので、Open の前に渡す。インスペクタの変更は、次に開くときから効く。
-            receiver.Close();
+            Close();
             receiver.Port = port;
             receiver.DelaySec = delaySec;
             receiver.ClaimedFields = claimedFields;
             receiver.Open();
+            isOpen = true;
         }
 
         public void Close()
         {
             receiver.Close();
+            isOpen = false;
         }
 
         public bool TryTakeNext(out FreeDProvidedPacket provided)
         {
             return receiver.TryTakeNext(out provided);
+        }
+
+        private void ThrowIfOpen()
+        {
+            if (isOpen)
+            {
+                throw new InvalidOperationException("FreeD: 開いている間は変えられない。Close してから変える");
+            }
         }
     }
 }
