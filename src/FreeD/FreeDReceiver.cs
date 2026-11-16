@@ -7,7 +7,7 @@ using CIFER.tech.RingBuffer;
 
 namespace CIFER.tech.FreeD.Core
 {
-    public sealed class FreeDReceiver : IDisposable
+    public sealed class FreeDReceiver : IFreeDReceiver, IDisposable
     {
         // 送信が 60 fps より速くても足りるように、最低限の数と、遅延 1 秒あたりの数 (240 fps 相当) を持つ。
         private const int MinCapacity = 256;
@@ -16,11 +16,44 @@ namespace CIFER.tech.FreeD.Core
         // FreeD D1 は 29 バイト。余裕を見た受信バッファの大きさ。
         private const int DatagramBufferSize = 64;
 
+        private int port = 40000;
         private float delaySec;
+        private FreeDField claimedFields = FreeDField.All;
+
         // 受信スレッドで起きた例外。スレッドの外へは投げられないので、TryTakeNext で投げる。
         private volatile Exception? receiveException;
         private RingBuffer<FreeDReceivedPacket>? buffer;
         private Socket? socket;
+
+        public int Port
+        {
+            get => port;
+            set
+            {
+                ThrowIfOpen();
+                port = value;
+            }
+        }
+
+        public float DelaySec
+        {
+            get => delaySec;
+            set
+            {
+                ThrowIfOpen();
+                delaySec = value;
+            }
+        }
+
+        public FreeDField ClaimedFields
+        {
+            get => claimedFields;
+            set
+            {
+                ThrowIfOpen();
+                claimedFields = value;
+            }
+        }
 
         public void Dispose()
         {
@@ -31,7 +64,15 @@ namespace CIFER.tech.FreeD.Core
         {
             Close();
 
-            this.delaySec = delaySec;
+            Port = port;
+            DelaySec = delaySec;
+            Open();
+        }
+
+        public void Open()
+        {
+            Close();
+
             receiveException = null;
             var receivedPackets = new RingBuffer<FreeDReceivedPacket>(MinCapacity + (int)(delaySec * CapacityPerDelaySec));
             buffer = receivedPackets;
@@ -64,6 +105,14 @@ namespace CIFER.tech.FreeD.Core
             // Close すると、受信スレッドの Receive が例外で抜けて、スレッドが終わる。
             socket?.Close();
             socket = null;
+        }
+
+        private void ThrowIfOpen()
+        {
+            if (socket != null)
+            {
+                throw new InvalidOperationException("FreeD: 開いている間は変えられない。Close してから変える");
+            }
         }
 
         private void ReceiveLoop(Socket receivingSocket, RingBuffer<FreeDReceivedPacket> receivedPackets)

@@ -4,33 +4,33 @@ namespace CIFER.tech.FreeD.Core
     public static class FreeDMerger
     {
         /// <summary>どちらにも含まれない項目は既定値になる。両方に含まれる項目は <paramref name="packetB"/> の値を使う。</summary>
-        public static FreeDPacket Merge(in FreeDPacket packetA, FreeDField fieldA, in FreeDPacket packetB, FreeDField fieldB)
+        public static FreeDPacket Merge(in FreeDPacket packetA, FreeDField fieldsA, in FreeDPacket packetB, FreeDField fieldsB)
         {
             var merged = new FreeDPacket();
-            CopyFields(ref merged, packetA, fieldA);
-            CopyFields(ref merged, packetB, fieldB);
+            CopyFields(ref merged, packetA, fieldsA);
+            CopyFields(ref merged, packetB, fieldsB);
             return merged;
         }
 
-        private static void CopyFields(ref FreeDPacket merged, in FreeDPacket source, FreeDField field)
+        private static void CopyFields(ref FreeDPacket merged, in FreeDPacket source, FreeDField copiedFields)
         {
-            if ((field & FreeDField.Rotation) != 0)
+            if ((copiedFields & FreeDField.Rotation) != 0)
             {
                 merged.PanDegrees = source.PanDegrees;
                 merged.TiltDegrees = source.TiltDegrees;
                 merged.RollDegrees = source.RollDegrees;
             }
-            if ((field & FreeDField.Position) != 0)
+            if ((copiedFields & FreeDField.Position) != 0)
             {
                 merged.XMeters = source.XMeters;
                 merged.YMeters = source.YMeters;
                 merged.ZMeters = source.ZMeters;
             }
-            if ((field & FreeDField.Zoom) != 0)
+            if ((copiedFields & FreeDField.Zoom) != 0)
             {
                 merged.ZoomRaw = source.ZoomRaw;
             }
-            if ((field & FreeDField.Focus) != 0)
+            if ((copiedFields & FreeDField.Focus) != 0)
             {
                 merged.FocusRaw = source.FocusRaw;
             }

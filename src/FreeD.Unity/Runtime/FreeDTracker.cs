@@ -4,9 +4,12 @@ using UnityEngine;
 namespace CIFER.tech.FreeD.Unity
 {
     [DisallowMultipleComponent]
-    public class FreeDTracker : MonoBehaviour
+    public class FreeDTracker : MonoBehaviour, IFreeDTracker
     {
         private const float GizmoArrowLengthM = 0.5f;
+
+        // Instance は、なければ作るので、解除では使えない (シーンを閉じるときに、作ってしまう)。登録した相手を覚えておく。
+        private FreeDManager manager;
 
         [SerializeField] private int cameraId = 1;
         [SerializeField] private Camera camera;
@@ -63,10 +66,10 @@ namespace CIFER.tech.FreeD.Unity
             set => focusToDistanceM = value;
         }
 
-        /// <summary>届いていない項目は値が 0 のままなので、field の項目だけを反映する。</summary>
-        public void Apply(in FreeDPacket packet, FreeDField field = FreeDField.All)
+        /// <summary>届いていない項目は値が 0 のままなので、appliedFields の項目だけを反映する。</summary>
+        public void Apply(in FreeDPacket packet, FreeDField appliedFields = FreeDField.All)
         {
-            if ((field & FreeDField.Rotation) != 0)
+            if ((appliedFields & FreeDField.Rotation) != 0)
             {
                 // FreeD 座標 (X=右, Y=前, Z=上, m) での姿勢。
                 // 回転は Rz(パン) · Rx(チルト) · Ry(ロール)。角度の正の向きは送信機器の仕様によるので、向きが逆なら rotationScale で反転する。
@@ -81,7 +84,7 @@ namespace CIFER.tech.FreeD.Unity
                 transform.localRotation = unityRotation * Quaternion.Euler(rotationOffset);
             }
 
-            if ((field & FreeDField.Position) != 0)
+            if ((appliedFields & FreeDField.Position) != 0)
             {
                 var unityPosition = new Vector3(
                     (float)packet.XMeters * positionScale.x,
@@ -96,19 +99,34 @@ namespace CIFER.tech.FreeD.Unity
 
             if (camera != null)
             {
-                if ((field & FreeDField.Zoom) != 0 && zoomToFocalLengthMm.length > 0)
+                if ((appliedFields & FreeDField.Zoom) != 0 && zoomToFocalLengthMm.length > 0)
                 {
                     camera.usePhysicalProperties = true;
                     camera.focalLength = zoomToFocalLengthMm.Evaluate(packet.ZoomRaw);
                 }
 
 #if UNITY_2022_2_OR_NEWER
-                if ((field & FreeDField.Focus) != 0 && focusToDistanceM.length > 0)
+                if ((appliedFields & FreeDField.Focus) != 0 && focusToDistanceM.length > 0)
                 {
                     camera.usePhysicalProperties = true;
                     camera.focusDistance = focusToDistanceM.Evaluate(packet.FocusRaw);
                 }
 #endif
+            }
+        }
+
+        private void OnEnable()
+        {
+            manager = FreeDManager.Instance;
+            manager.AddTracker(this);
+        }
+
+        private void OnDisable()
+        {
+            if (manager != null)
+            {
+                manager.RemoveTracker(this);
+                manager = null;
             }
         }
 
