@@ -97,7 +97,9 @@ namespace CIFER.tech.FreeD.Unity
         }
 
         /// <summary>届いていない項目は値が 0 のままなので、appliedFields の項目だけを反映する。</summary>
-        public void Apply(in FreeDPacket packet, FreeDField appliedFields = FreeDField.All)
+        public void Apply(
+            in FreeDPacket packet,
+            FreeDField appliedFields = FreeDField.Rotation | FreeDField.Position | FreeDField.Zoom | FreeDField.Focus)
         {
             if ((appliedFields & FreeDField.Rotation) != 0)
             {

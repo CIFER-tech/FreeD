@@ -18,7 +18,7 @@ namespace CIFER.tech.FreeD.Core
 
         private int port = 40000;
         private float delaySec;
-        private FreeDField claimedFields = FreeDField.All;
+        private FreeDField claimedFields = FreeDField.Rotation | FreeDField.Position | FreeDField.Zoom | FreeDField.Focus;
 
         // 受信スレッドで起きた例外。スレッドの外へは投げられないので、TryTakeNext で投げる。
         private volatile Exception? receiveException;

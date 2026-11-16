@@ -86,7 +86,8 @@ Model と View は、`OnEnable` と `OnDisable` で、`FreeDManager` に登録�
 ```csharp
 public sealed class RecordedReceiver : MonoBehaviour, IFreeDReceiver
 {
-    public FreeDField ClaimedFields { get; set; } = FreeDField.All;
+    public FreeDField ClaimedFields { get; set; } =
+        FreeDField.Rotation | FreeDField.Position | FreeDField.Zoom | FreeDField.Focus;
     public float DelaySec { get; set; }
 
     public void Open() { /* 再生を始める */ }
