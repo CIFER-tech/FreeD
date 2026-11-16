@@ -131,7 +131,9 @@ namespace CIFER.tech.FreeD.Unity
         private void UpdateReceivers()
         {
             // Apply などの中で登録が変わっても壊れないよう、foreach ではなく for で回す。
-            for (var i = 0; i < receivers.Count; i++)
+            // 回している間に足されたものは、次のフレームから使う (自分を解除して登録し直す実装で、止まらないようにするため)。
+            var receiverCount = receivers.Count;
+            for (var i = 0; i < receiverCount; i++)
             {
                 var receiver = receivers[i];
                 if (receiver == null)
@@ -152,7 +154,8 @@ namespace CIFER.tech.FreeD.Unity
 
         private void UpdateTrackers()
         {
-            for (var i = 0; i < trackers.Count; i++)
+            var trackerCount = trackers.Count;
+            for (var i = 0; i < trackerCount; i++)
             {
                 var tracker = trackers[i];
                 if (tracker == null)
