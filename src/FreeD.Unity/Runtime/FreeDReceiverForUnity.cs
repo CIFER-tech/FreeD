@@ -1,7 +1,6 @@
 ﻿using System;
 using CIFER.tech.FreeD.Core;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace CIFER.tech.FreeD.Unity
 {
@@ -14,10 +13,7 @@ namespace CIFER.tech.FreeD.Unity
         [SerializeField] private int port = 40000;
         [SerializeField] private float delaySec = 0f;
 
-        // 保存済みのシーンの値を失わないよう、元の名前 field を引き継ぐ。
-        [FormerlySerializedAs("field")]
-        [SerializeField]
-        private FreeDField claimedFields = FreeDField.Position | FreeDField.Rotation | FreeDField.Zoom | FreeDField.Focus;
+        [SerializeField] private FreeDField claimedFields = FreeDField.Position | FreeDField.Rotation | FreeDField.Zoom | FreeDField.Focus;
 
         private readonly FreeDReceiver receiver = new FreeDReceiver();
 
