@@ -13,7 +13,7 @@
 
   <PropertyGroup>
     <PackageId>CIFER.tech.FreeD.Core</PackageId>
-    <Version>3.0.1</Version>
+    <Version>4.0.0</Version>
     <Authors>CIFER.tech</Authors>
     <Description>FreeD (D1, 29 バイト) メッセージの符号化・復号・合成と、UDP での受信。</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
