@@ -58,11 +58,11 @@ FreeDPacket merged = FreeDMerger.Merge(
 
 - 項目が重なったときは、2 つ目のパケットの値を使う。
 - 状態は持たない。最後に届いた値を保つこと、遅延、途切れの扱いは呼び出し側で行う。
-- Unity では `FreeDManager`・`FreeDReceiverForUnity`・`FreeDTracker` が使っている ([`src/FreeD.Unity/`](src/FreeD.Unity) 参照)。
+- Unity では `FreeDManager`・`FreeDReceiverForUnity`・`FreeDCameraConsumer` が使っている ([`src/FreeD.Unity/`](src/FreeD.Unity) 参照)。
 
 ## Unity で原点を合わせる
 
-`FreeDTracker` を付けたカメラの親のオブジェクトが、「FreeD 座標の原点が Unity のどこにあるか」になる。親の Position と Rotation の Y に、原点の位置と水平の向きを入れる (青い矢印 = FreeD の Y、赤い矢印 = X)。
+`FreeDCameraConsumer` を付けたカメラの親のオブジェクトが、「FreeD 座標の原点が Unity のどこにあるか」になる。親の Position と Rotation の Y に、原点の位置と水平の向きを入れる (青い矢印 = FreeD の Y、赤い矢印 = X)。
 
 - 吸収するのは位置 3 軸と水平の向きだけ。床は水平とみなすので、親の傾き (X・Z の回転) は 0 にする。
 

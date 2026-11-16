@@ -10,7 +10,7 @@ namespace CIFER.tech.FreeD.Unity
     public sealed class FreeDManager : SingletonBehaviour<FreeDManager>
     {
         private readonly List<IFreeDProvider> providers = new();
-        private readonly List<IFreeDTracker> trackers = new();
+        private readonly List<IFreeDConsumer> consumers = new();
         private readonly FreeDMergedCamera[] mergedByCameraId = new FreeDMergedCamera[byte.MaxValue + 1];
 
         // Update で回している間の解除は、要素を詰めると次の要素を飛ばすので、その場では null にして、回し終えてから詰める。
@@ -45,7 +45,7 @@ namespace CIFER.tech.FreeD.Unity
             try
             {
                 UpdateProviders();
-                UpdateTrackers();
+                UpdateConsumers();
             }
             finally
             {
@@ -75,7 +75,7 @@ namespace CIFER.tech.FreeD.Unity
         protected override void OnDestroy()
         {
             providers.Clear();
-            trackers.Clear();
+            consumers.Clear();
             base.OnDestroy();
         }
 
@@ -112,20 +112,20 @@ namespace CIFER.tech.FreeD.Unity
             }
         }
 
-        public void AddTracker(IFreeDTracker tracker)
+        public void AddConsumer(IFreeDConsumer consumer)
         {
-            if (tracker != null && !trackers.Contains(tracker))
+            if (consumer != null && !consumers.Contains(consumer))
             {
-                trackers.Add(tracker);
+                consumers.Add(consumer);
             }
         }
 
-        public void RemoveTracker(IFreeDTracker tracker)
+        public void RemoveConsumer(IFreeDConsumer consumer)
         {
-            var index = trackers.IndexOf(tracker);
+            var index = consumers.IndexOf(consumer);
             if (index >= 0)
             {
-                RemoveAt(trackers, index);
+                RemoveAt(consumers, index);
             }
         }
 
@@ -195,26 +195,26 @@ namespace CIFER.tech.FreeD.Unity
 
                     merged.packet = FreeDMerger.Merge(merged.packet, ~provider.ClaimedFields, packet.packet, provider.ClaimedFields);
 
-                    // Merge は項目だけを写すので、CameraId は 0 になる。自作の Tracker が Apply の中で読めるよう、戻す。
+                    // Merge は項目だけを写すので、CameraId は 0 になる。自作のコンシューマが Apply の中で読めるよう、戻す。
                     merged.packet.CameraId = packet.packet.CameraId;
                     merged.receivedFields |= provider.ClaimedFields;
                 }
             }
         }
 
-        private void UpdateTrackers()
+        private void UpdateConsumers()
         {
             var claimedFields = GetClaimedFields();
-            var trackerCount = trackers.Count;
-            for (var i = 0; i < trackerCount; i++)
+            var consumerCount = consumers.Count;
+            for (var i = 0; i < consumerCount; i++)
             {
-                var tracker = trackers[i];
-                if (tracker == null)
+                var consumer = consumers[i];
+                if (consumer == null)
                 {
                     continue;
                 }
 
-                var cameraId = tracker.CameraId;
+                var cameraId = consumer.CameraId;
                 if ((uint)cameraId >= (uint)mergedByCameraId.Length)
                 {
                     continue;
@@ -225,7 +225,7 @@ namespace CIFER.tech.FreeD.Unity
                 var appliedFields = merged.receivedFields & claimedFields;
                 if (appliedFields != FreeDField.None)
                 {
-                    tracker.Apply(merged.packet, appliedFields);
+                    consumer.Apply(merged.packet, appliedFields);
                 }
             }
         }
@@ -252,7 +252,7 @@ namespace CIFER.tech.FreeD.Unity
             }
 
             providers.RemoveAll(static provider => provider == null);
-            trackers.RemoveAll(static tracker => tracker == null);
+            consumers.RemoveAll(static consumer => consumer == null);
             hasRemovedWhileUpdating = false;
         }
 

@@ -4,7 +4,7 @@ using UnityEngine;
 namespace CIFER.tech.FreeD.Unity
 {
     [DisallowMultipleComponent]
-    public class FreeDTracker : MonoBehaviour, IFreeDTracker
+    public class FreeDCameraConsumer : MonoBehaviour, IFreeDConsumer
     {
         private const float GizmoArrowLengthM = 0.5f;
 
@@ -69,14 +69,14 @@ namespace CIFER.tech.FreeD.Unity
         private void OnEnable()
         {
             manager = FreeDManager.Instance;
-            manager.AddTracker(this);
+            manager.AddConsumer(this);
         }
 
         private void OnDisable()
         {
             if (manager != null)
             {
-                manager.RemoveTracker(this);
+                manager.RemoveConsumer(this);
                 manager = null;
             }
         }
