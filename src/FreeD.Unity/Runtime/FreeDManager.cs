@@ -17,6 +17,68 @@ namespace CIFER.tech.FreeD.Unity
         private bool isUpdating;
         private bool hasRemovedWhileUpdating;
 
+        private void OnEnable()
+        {
+            if (!IsSingletonInstance)
+            {
+                return;
+            }
+
+            // Open の中で登録が変わっても壊れないよう、写しを回す。まれにしか起きないので、確保は許す。
+            foreach (var receiver in receivers.ToArray())
+            {
+                if (receiver != null && receivers.Contains(receiver))
+                {
+                    OpenReceiver(receiver);
+                }
+            }
+        }
+
+        private void Update()
+        {
+            if (HasOverlappedField())
+            {
+                return;
+            }
+
+            isUpdating = true;
+            try
+            {
+                UpdateReceivers();
+                UpdateTrackers();
+            }
+            finally
+            {
+                isUpdating = false;
+                RemoveNullEntries();
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (!IsSingletonInstance)
+            {
+                return;
+            }
+
+            foreach (var receiver in receivers.ToArray())
+            {
+                if (receiver != null && receivers.Contains(receiver))
+                {
+                    receiver.Close();
+                }
+            }
+
+            Array.Clear(mergedByCameraId, 0, mergedByCameraId.Length);
+        }
+
+        protected override void OnDestroy()
+        {
+            receivers.Clear();
+            trackers.Clear();
+            base.OnDestroy();
+        }
+
         public void AddReceiver(IFreeDReceiver receiver)
         {
             if (receiver == null || receivers.Contains(receiver))
@@ -67,66 +129,44 @@ namespace CIFER.tech.FreeD.Unity
             }
         }
 
-        private void OnEnable()
+        private void OpenReceiver(IFreeDReceiver receiver)
         {
-            if (!IsSingletonInstance)
-            {
-                return;
-            }
-
-            // Open の中で登録が変わっても壊れないよう、写しを回す。まれにしか起きないので、確保は許す。
-            foreach (var receiver in receivers.ToArray())
-            {
-                if (receiver != null && receivers.Contains(receiver))
-                {
-                    OpenReceiver(receiver);
-                }
-            }
-        }
-
-        private void OnDisable()
-        {
-            if (!IsSingletonInstance)
-            {
-                return;
-            }
-
-            foreach (var receiver in receivers.ToArray())
-            {
-                if (receiver != null && receivers.Contains(receiver))
-                {
-                    receiver.Close();
-                }
-            }
-
-            Array.Clear(mergedByCameraId, 0, mergedByCameraId.Length);
-        }
-
-        protected override void OnDestroy()
-        {
-            receivers.Clear();
-            trackers.Clear();
-            base.OnDestroy();
-        }
-
-        private void Update()
-        {
-            if (HasOverlappedField())
-            {
-                return;
-            }
-
-            isUpdating = true;
+            // ポートを開けない Receiver があっても、残りの Receiver は開く。
             try
             {
-                UpdateReceivers();
-                UpdateTrackers();
+                receiver.Open();
             }
-            finally
+            catch (InvalidOperationException e)
             {
-                isUpdating = false;
-                RemoveNullEntries();
+                Debug.LogException(e, this);
             }
+        }
+
+        /// <summary>同じ項目を 2 つのストリームが担当すると合成できないので、重なっていないかを調べる。</summary>
+        private bool HasOverlappedField()
+        {
+            var claimedFields = FreeDField.None;
+            var isOverlapped = false;
+
+            for (var i = 0; i < receivers.Count; i++)
+            {
+                if (receivers[i] == null)
+                {
+                    continue;
+                }
+
+                var receiverFields = receivers[i].ClaimedFields;
+                var overlappedFields = claimedFields & receiverFields;
+                if (overlappedFields != FreeDField.None)
+                {
+                    Debug.LogError("FreeD: 同じ項目を複数の Receiver が担当している: " + overlappedFields, this);
+                    isOverlapped = true;
+                }
+
+                claimedFields |= receiverFields;
+            }
+
+            return isOverlapped;
         }
 
         private void UpdateReceivers()
@@ -190,43 +230,6 @@ namespace CIFER.tech.FreeD.Unity
             }
         }
 
-        private void RemoveAt<TItem>(List<TItem> items, int index) where TItem : class
-        {
-            if (!isUpdating)
-            {
-                items.RemoveAt(index);
-                return;
-            }
-
-            items[index] = null;
-            hasRemovedWhileUpdating = true;
-        }
-
-        private void RemoveNullEntries()
-        {
-            if (!hasRemovedWhileUpdating)
-            {
-                return;
-            }
-
-            receivers.RemoveAll(static receiver => receiver == null);
-            trackers.RemoveAll(static tracker => tracker == null);
-            hasRemovedWhileUpdating = false;
-        }
-
-        private void OpenReceiver(IFreeDReceiver receiver)
-        {
-            // ポートを開けない Receiver があっても、残りの Receiver は開く。
-            try
-            {
-                receiver.Open();
-            }
-            catch (InvalidOperationException e)
-            {
-                Debug.LogException(e, this);
-            }
-        }
-
         private FreeDField GetClaimedFields()
         {
             var claimedFields = FreeDField.None;
@@ -241,31 +244,28 @@ namespace CIFER.tech.FreeD.Unity
             return claimedFields;
         }
 
-        /// <summary>同じ項目を 2 つのストリームが担当すると合成できないので、重なっていないかを調べる。</summary>
-        private bool HasOverlappedField()
+        private void RemoveNullEntries()
         {
-            var claimedFields = FreeDField.None;
-            var isOverlapped = false;
-
-            for (var i = 0; i < receivers.Count; i++)
+            if (!hasRemovedWhileUpdating)
             {
-                if (receivers[i] == null)
-                {
-                    continue;
-                }
-
-                var receiverFields = receivers[i].ClaimedFields;
-                var overlappedFields = claimedFields & receiverFields;
-                if (overlappedFields != FreeDField.None)
-                {
-                    Debug.LogError("FreeD: 同じ項目を複数の Receiver が担当している: " + overlappedFields, this);
-                    isOverlapped = true;
-                }
-
-                claimedFields |= receiverFields;
+                return;
             }
 
-            return isOverlapped;
+            receivers.RemoveAll(static receiver => receiver == null);
+            trackers.RemoveAll(static tracker => tracker == null);
+            hasRemovedWhileUpdating = false;
+        }
+
+        private void RemoveAt<TItem>(List<TItem> items, int index) where TItem : class
+        {
+            if (!isUpdating)
+            {
+                items.RemoveAt(index);
+                return;
+            }
+
+            items[index] = null;
+            hasRemovedWhileUpdating = true;
         }
     }
 }
