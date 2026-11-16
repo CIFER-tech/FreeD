@@ -48,8 +48,8 @@ if (FreeDCodec.TryDecode(received, out FreeDPacket p)) { /* ... */ }
 - `FreeDReceiverForUnity`: ポート 1 つで受信するだけ (受信そのものは `FreeDReceiver` が行う)。送信元のポートごとに 1 つ置く。
 - `FreeDTracker`: カメラ ID を指定して値を受け取り、自分のオブジェクトの位置・向きに反映する。親のオブジェクトが FreeD 座標の原点になる。
 
-1. パッケージを入れる。`FreeDManager` は、置かなくてよい。置くときは、ルートの GameObject に置く (子に置くと、シーンの切り替えで壊れる)。
-2. 空のオブジェクト (Manager の子でもよい) に `FreeDReceiverForUnity` を追加し、`Port` を送信側のポート (既定 40000) に合わせる。
+1. パッケージを入れる。`FreeDManager` は、置かなくてよい。置くときは、ルートの GameObject に置く (子に置くと、シーンの切り替えで壊れる)。`FreeDManager` は、シーンを切り替えても残るので、その子に置いたものも、いっしょに残る。`FreeDReceiverForUnity` や `FreeDTracker` を、`FreeDManager` の子に置かない (シーンを読み直すと、残ったものと新しいものが、同じ項目を担当して、重なりのエラーになる)。
+2. 空のオブジェクト (`FreeDManager` の子ではないもの) に `FreeDReceiverForUnity` を追加し、`Port` を送信側のポート (既定 40000) に合わせる。
 3. 空のオブジェクトを 1 つ作り、FreeD 座標の原点にあたる Unity 上の場所と向きに合わせる (Position と Rotation の Y)。Scene ビューの青い矢印 = FreeD の Y、赤い矢印 = X。床は水平とみなすので、Rotation の X・Z は 0 にする。
 4. その子に Unity のカメラを置き、`FreeDTracker` を追加する。`Camera Id` を送信側のカメラ ID に合わせ、`Camera` の欄にそのカメラを割り当てる。`Camera` の欄が空だと、ズームとフォーカスは反映されない (位置と向きは反映される)。
 5. 再生すると、カメラが受信した位置・向きに動く。向きが逆なら、`Rotation Scale` の該当する軸 (X=パン, Y=チルト, Z=ロール) を -1 にする。位置が逆なら、`Position Scale` の該当する軸 (X=右, Y=前, Z=上) を -1 にする。カメラ取り付けのずれは `Position Offset` / `Rotation Offset` で合わせる (どちらも Unity の座標・向きで指定。カメラのローカル軸: 右・上・前、回転は Transform の Rotation と同じ)。
