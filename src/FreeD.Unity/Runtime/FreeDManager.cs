@@ -29,9 +29,18 @@ namespace CIFER.tech.FreeD.Unity
 
         public void RemoveReceiver(IFreeDReceiver receiver)
         {
-            if (receivers.Remove(receiver))
+            if (!receivers.Remove(receiver))
             {
-                receiver.Close();
+                return;
+            }
+
+            receiver.Close();
+
+            // FreeDManager はシーンを切り替えても残るので、担当がいなくなった項目の値を、反映し続けないようにする。
+            var orphanedFields = receiver.ClaimedFields & ~GetClaimedFields();
+            for (var i = 0; i < mergedByCameraId.Length; i++)
+            {
+                mergedByCameraId[i].receivedFields &= ~orphanedFields;
             }
         }
 
@@ -133,6 +142,17 @@ namespace CIFER.tech.FreeD.Unity
             {
                 Debug.LogException(e, this);
             }
+        }
+
+        private FreeDField GetClaimedFields()
+        {
+            var claimedFields = FreeDField.None;
+            for (var i = 0; i < receivers.Count; i++)
+            {
+                claimedFields |= receivers[i].ClaimedFields;
+            }
+
+            return claimedFields;
         }
 
         /// <summary>同じ項目を 2 つのストリームが担当すると合成できないので、重なっていないかを調べる。</summary>
