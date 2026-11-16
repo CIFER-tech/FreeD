@@ -154,6 +154,9 @@ namespace CIFER.tech.FreeD.Unity
                     ref var merged = ref mergedByCameraId[packet.packet.CameraId];
 
                     merged.packet = FreeDMerger.Merge(merged.packet, ~receiver.ClaimedFields, packet.packet, receiver.ClaimedFields);
+
+                    // Merge は項目だけを写すので、CameraId は 0 になる。自作の Tracker が Apply の中で読めるよう、戻す。
+                    merged.packet.CameraId = packet.packet.CameraId;
                     merged.receivedFields |= receiver.ClaimedFields;
                 }
             }
