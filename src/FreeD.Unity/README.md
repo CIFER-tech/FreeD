@@ -110,6 +110,8 @@ public sealed class RecordedReceiver : MonoBehaviour, IFreeDReceiver
 }
 ```
 
+- `FreeDManager.Instance` は、なければ作る。終了中に呼ぶと、作ってしまうことがあるので、`OnDisable` と `OnDestroy` では、`FreeDManager.ExistingInstance` を使う (なければ作らない)。
+- singleton の仕組みは、`public` な基底クラス `SingletonBehaviour<T>` にあり、`FreeDManager` が使っている。
 - `ClaimedFields` と `DelaySec` は、`Open` の時点の値で動く。開いている間に変えると、`InvalidOperationException` になる (`FreeDReceiver` の動作)。変えるときは、`Close()`、変更、`Open()` の順に行う。
 - `FreeDReceiverForUnity` のインスペクタの値を、再生中に変えたときは、コンポーネントを無効にして、有効にし直すと反映される。
 - ポート番号は、`IFreeDReceiver` に含めない。ポートを持つのは、`FreeDReceiver` の `Port` だけ。

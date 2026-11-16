@@ -6,49 +6,11 @@ using UnityEngine;
 namespace CIFER.tech.FreeD.Unity
 {
     [DisallowMultipleComponent]
-    public sealed class FreeDManager : MonoBehaviour
+    public sealed class FreeDManager : SingletonBehaviour<FreeDManager>
     {
-        private static FreeDManager instance;
-        private static bool isQuitting;
-
         private readonly List<IFreeDReceiver> receivers = new();
         private readonly List<IFreeDTracker> trackers = new();
         private readonly FreeDMergedCamera[] mergedByCameraId = new FreeDMergedCamera[byte.MaxValue + 1];
-
-        /// <summary>Receiver や Tracker の OnEnable が、FreeDManager の Awake より先に走っても登録できるよう、なければ作る。</summary>
-        public static FreeDManager Instance
-        {
-            get
-            {
-                if (instance != null)
-                {
-                    return instance;
-                }
-
-                // 終了中に作ると、作ったものがシーンに残る。
-                if (isQuitting)
-                {
-                    return null;
-                }
-
-                instance = FindExistingInstance();
-                if (instance == null)
-                {
-                    instance = new GameObject(nameof(FreeDManager)).AddComponent<FreeDManager>();
-                }
-
-                return instance;
-            }
-        }
-
-        /// <summary>解除のときに使う。なければ作らない (シーンを閉じるときに、作ってしまわないため)。</summary>
-        public static FreeDManager ExistingInstance
-        {
-            get
-            {
-                return instance;
-            }
-        }
 
         public void AddReceiver(IFreeDReceiver receiver)
         {
@@ -85,57 +47,9 @@ namespace CIFER.tech.FreeD.Unity
             trackers.Remove(tracker);
         }
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStaticState()
-        {
-            // ドメインのリロードなしで再生すると、前の再生の値が残る。
-            instance = null;
-            isQuitting = false;
-            Application.quitting -= OnApplicationQuitting;
-            Application.quitting += OnApplicationQuitting;
-        }
-
-        private static void OnApplicationQuitting()
-        {
-            isQuitting = true;
-        }
-
-        private static FreeDManager FindExistingInstance()
-        {
-#if UNITY_6000_5_OR_NEWER
-            var found = FindObjectsByType<FreeDManager>(FindObjectsInactive.Include);
-#elif UNITY_2022_2_OR_NEWER
-            var found = FindObjectsByType<FreeDManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-#else
-            var found = FindObjectsOfType<FreeDManager>(true);
-#endif
-            return found.Length > 0 ? found[0] : null;
-        }
-
-        private void Awake()
-        {
-            if (instance != null && instance != this)
-            {
-                Debug.LogWarning("FreeD: FreeDManager が複数ある。あとのものを壊す", this);
-                Destroy(this);
-                return;
-            }
-
-            instance = this;
-
-            // DontDestroyOnLoad は、ルートの GameObject にしか効かない。
-            if (transform.parent != null)
-            {
-                Debug.LogWarning("FreeD: FreeDManager をルートの GameObject に置かないと、シーンの切り替えで壊れる", this);
-                return;
-            }
-
-            DontDestroyOnLoad(gameObject);
-        }
-
         private void OnEnable()
         {
-            if (instance != this)
+            if (!IsSingletonInstance)
             {
                 return;
             }
@@ -148,7 +62,7 @@ namespace CIFER.tech.FreeD.Unity
 
         private void OnDisable()
         {
-            if (instance != this)
+            if (!IsSingletonInstance)
             {
                 return;
             }
@@ -161,16 +75,11 @@ namespace CIFER.tech.FreeD.Unity
             Array.Clear(mergedByCameraId, 0, mergedByCameraId.Length);
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
-            if (instance != this)
-            {
-                return;
-            }
-
             receivers.Clear();
             trackers.Clear();
-            instance = null;
+            base.OnDestroy();
         }
 
         private void Update()
