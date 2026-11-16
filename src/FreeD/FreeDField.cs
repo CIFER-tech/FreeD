@@ -11,5 +11,6 @@ namespace CIFER.tech.FreeD.Core
         Position = 1 << 1, // X・Y・Z
         Zoom = 1 << 2,
         Focus = 1 << 3,
+        All = Rotation | Position | Zoom | Focus,
     }
 }

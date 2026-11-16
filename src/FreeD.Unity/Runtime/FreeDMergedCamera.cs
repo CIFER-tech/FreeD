@@ -2,10 +2,11 @@ using CIFER.tech.FreeD.Core;
 
 namespace CIFER.tech.FreeD.Unity
 {
-    /// <summary>カメラ ID ごとの、合成したパケットと、Receiver から届いたことのある項目。</summary>
-    internal sealed class FreeDMergedCamera
+    internal struct FreeDMergedCamera
     {
-        public readonly FreeDPacket packet = new FreeDPacket();
+        public FreeDPacket packet;
+
+        // 届いていない項目は packet の値が 0 のままなので、届いたことのある項目を覚える。
         public FreeDField fields;
     }
 }

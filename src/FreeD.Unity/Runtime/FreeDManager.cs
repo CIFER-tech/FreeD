@@ -11,7 +11,6 @@ namespace CIFER.tech.FreeD.Unity
         private readonly List<FreeDReceiverForUnity> receivers = new();
         private readonly List<FreeDTracker> trackers = new();
         private readonly FreeDMergedCamera[] mergedByCameraId = new FreeDMergedCamera[byte.MaxValue + 1];
-        private readonly FreeDPacket receivedPacket = new();
 
         private void OnEnable()
         {
@@ -26,10 +25,12 @@ namespace CIFER.tech.FreeD.Unity
             trackers.AddRange(FindObjectsOfType<FreeDTracker>(true));
 #endif
 
+            // 控えとして無効にしてある Receiver は、受信にも項目の重なりの検査にも使わない。
             receivers.RemoveAll(receiver => !receiver.isActiveAndEnabled);
 
             foreach (var receiver in receivers)
             {
+                // ポートを開けない Receiver があっても、残りの Receiver は開く。
                 try
                 {
                     receiver.Open();
@@ -49,7 +50,6 @@ namespace CIFER.tech.FreeD.Unity
             }
 
             Array.Clear(mergedByCameraId, 0, mergedByCameraId.Length);
-
             receivers.Clear();
             trackers.Clear();
         }
@@ -66,12 +66,12 @@ namespace CIFER.tech.FreeD.Unity
             foreach (var receiver in receivers)
             {
                 // 1 つのポートに複数のカメラ ID が届くので、遅延を過ぎたパケットを古い順にすべて合成する。
-                while (receiver.TryTakeNext(receivedPacket))
+                while (receiver.TryTakeNext(out var packet))
                 {
-                    var merged = mergedByCameraId[receivedPacket.CameraId] ??= new FreeDMergedCamera();
+                    ref var merged = ref mergedByCameraId[packet.packet.CameraId];
 
                     // この Receiver の担当項目だけを新しい値にし、残りは今までの値を保つ。
-                    merged.packet.CopyFieldsFrom(receivedPacket, receiver.Field);
+                    merged.packet = FreeDMerger.Merge(merged.packet, ~receiver.Field, packet.packet, receiver.Field);
                     merged.fields |= receiver.Field;
                 }
             }
@@ -89,9 +89,8 @@ namespace CIFER.tech.FreeD.Unity
                     continue;
                 }
 
-                // Receiver から、まだ何も届いていないカメラ ID は、反映しない。
-                var merged = mergedByCameraId[cameraId];
-                if (merged != null && merged.fields != FreeDField.None)
+                ref var merged = ref mergedByCameraId[cameraId];
+                if (merged.fields != FreeDField.None)
                 {
                     tracker.Apply(merged.packet, merged.fields);
                 }
@@ -109,7 +108,7 @@ namespace CIFER.tech.FreeD.Unity
                     continue;
                 }
 
-                receiver?.Close();
+                receiver.Close();
                 receivers.RemoveAt(i);
             }
         }
