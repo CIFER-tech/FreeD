@@ -145,6 +145,12 @@ namespace CIFER.tech.FreeD.Unity
                 // 1 つのポートに複数のカメラ ID が届くので、遅延を過ぎたパケットを古い順にすべて合成する。
                 while (receiver.TryTakeNext(out var packet))
                 {
+                    // TryTakeNext の中で解除されたら、解除で外した項目を戻さない。再登録されていても、そのフレームでは使わない。
+                    if (receivers[i] != receiver)
+                    {
+                        break;
+                    }
+
                     ref var merged = ref mergedByCameraId[packet.packet.CameraId];
 
                     merged.packet = FreeDMerger.Merge(merged.packet, ~receiver.ClaimedFields, packet.packet, receiver.ClaimedFields);
