@@ -159,7 +159,7 @@ namespace CIFER.tech.FreeD.Unity
                 var overlappedFields = claimedFields & providerFields;
                 if (overlappedFields != FreeDField.None)
                 {
-                    Debug.LogError("FreeD: 同じ項目を複数のプロバイダが担当している: " + overlappedFields, this);
+                    Debug.LogError("FreeD: 同じ項目を複数のプロバイダ (FreeDReceiverForUnity など) が担当している: " + overlappedFields, this);
                     isOverlapped = true;
                 }
 
